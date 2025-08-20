@@ -4,12 +4,11 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { CalendarIcon } from "lucide-react";
+import { CalendarIcon, ChevronUp, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ACTIVITY_TYPES, type ActivityType } from "@/store/appStore";
 
@@ -48,6 +47,20 @@ const ShiftPlanningForm = ({ onSubmit, onReset }: ShiftPlanningFormProps) => {
     onSubmit(values);
     form.reset();
     onReset?.();
+  };
+
+  const incrementOperators = () => {
+    const current = form.getValues("numOperators");
+    if (current < 20) {
+      form.setValue("numOperators", current + 1);
+    }
+  };
+
+  const decrementOperators = () => {
+    const current = form.getValues("numOperators");
+    if (current > 1) {
+      form.setValue("numOperators", current - 1);
+    }
   };
 
   return (
@@ -155,15 +168,43 @@ const ShiftPlanningForm = ({ onSubmit, onReset }: ShiftPlanningFormProps) => {
 
           {/* N°operatori */}
           <div className="space-y-2">
-            <Input
-              type="number"
-              min="1"
-              max="20"
-              placeholder="N° operatori"
-              className="h-11 text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-              value={form.watch("numOperators")}
-              onChange={(e) => form.setValue("numOperators", parseInt(e.target.value) || 1)}
-            />
+            <div className="relative">
+              <Input
+                type="number"
+                min="1"
+                max="20"
+                placeholder="N° operatori"
+                className="h-11 text-center pr-10 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                value={form.watch("numOperators")}
+                onChange={(e) => form.setValue("numOperators", parseInt(e.target.value) || 1)}
+              />
+              <div className="absolute right-1 top-1/2 -translate-y-1/2 flex flex-col">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-5 w-8 p-0 mb-1"
+                  onClick={() => {
+                    const current = form.getValues("numOperators");
+                    if (current < 20) form.setValue("numOperators", current + 1);
+                  }}
+                >
+                  <ChevronUp className="h-3 w-3" />
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-5 w-8 p-0"
+                  onClick={() => {
+                    const current = form.getValues("numOperators");
+                    if (current > 1) form.setValue("numOperators", current - 1);
+                  }}
+                >
+                  <ChevronDown className="h-3 w-3" />
+                </Button>
+              </div>
+            </div>
             {form.formState.errors.numOperators && (
               <p className="text-sm text-destructive">{form.formState.errors.numOperators.message}</p>
             )}
