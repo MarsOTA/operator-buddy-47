@@ -222,7 +222,7 @@ const EventDetail = () => {
               </div>
               
               <div className="flex items-center gap-3">
-                <Calendar className="h-5 w-5 text-muted-foreground" />
+                <Calendar className="h-5 w-5" style={{ color: '#72AD97', backgroundColor: 'transparent' }} />
                 <div className="flex-1">
                   <div className="flex gap-2">
                     <Input
