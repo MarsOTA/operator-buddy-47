@@ -65,7 +65,7 @@ const ShiftPlanningForm = ({ onSubmit, onReset }: ShiftPlanningFormProps) => {
   };
 
   return (
-    <div className="rounded-lg p-6 border border-border" style={{ backgroundColor: 'hsl(var(--shift-form-background))' }}>
+    <div className="rounded-lg p-6 border border-border mr-[30px]" style={{ backgroundColor: 'hsl(var(--shift-form-background))' }}>
       <h2 className="text-lg font-extrabold mb-6" style={{ 
         color: 'hsl(var(--shift-form-title))', 
         fontFamily: "'Mulish', sans-serif" 
