@@ -102,7 +102,13 @@ const EventDetail = () => {
 
   const calculateHours = (startTime: string, endTime: string) => {
     const start = new Date(`2000-01-01T${startTime}`);
-    const end = new Date(`2000-01-01T${endTime}`);
+    let end = new Date(`2000-01-01T${endTime}`);
+    
+    // Handle overnight shifts (e.g., 20:00 to 03:00)
+    if (end.getTime() < start.getTime()) {
+      end = new Date(`2000-01-02T${endTime}`); // Add one day to end time
+    }
+    
     const hours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
     return hours.toFixed(1);
   };
