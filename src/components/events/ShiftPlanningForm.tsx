@@ -9,7 +9,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { CalendarIcon, Clock, ChevronUp, ChevronDown } from "lucide-react";
+import { CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ACTIVITY_TYPES, type ActivityType } from "@/store/appStore";
 
@@ -48,20 +48,6 @@ const ShiftPlanningForm = ({ onSubmit, onReset }: ShiftPlanningFormProps) => {
     onSubmit(values);
     form.reset();
     onReset?.();
-  };
-
-  const incrementOperators = () => {
-    const current = form.getValues("numOperators");
-    if (current < 20) {
-      form.setValue("numOperators", current + 1);
-    }
-  };
-
-  const decrementOperators = () => {
-    const current = form.getValues("numOperators");
-    if (current > 1) {
-      form.setValue("numOperators", current - 1);
-    }
   };
 
   return (
@@ -169,28 +155,15 @@ const ShiftPlanningForm = ({ onSubmit, onReset }: ShiftPlanningFormProps) => {
 
           {/* N°operatori */}
           <div className="space-y-2">
-            <div className="relative">
-              <Input
-                type="number"
-                min="1"
-                max="20"
-                placeholder="N° operatori"
-                className="h-11 text-center pr-8"
-                value={form.watch("numOperators")}
-                onChange={(e) => form.setValue("numOperators", parseInt(e.target.value) || 1)}
-              />
-              <div className="absolute right-1 top-1/2 -translate-y-1/2 flex flex-col">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-4 w-6 p-0 hover:bg-muted"
-                  onClick={incrementOperators}
-                >
-                  <ChevronUp className="h-3 w-3" style={{ color: 'hsl(var(--shift-form-icons))' }} />
-                </Button>
-              </div>
-            </div>
+            <Input
+              type="number"
+              min="1"
+              max="20"
+              placeholder="N° operatori"
+              className="h-11 text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+              value={form.watch("numOperators")}
+              onChange={(e) => form.setValue("numOperators", parseInt(e.target.value) || 1)}
+            />
             {form.formState.errors.numOperators && (
               <p className="text-sm text-destructive">{form.formState.errors.numOperators.message}</p>
             )}
