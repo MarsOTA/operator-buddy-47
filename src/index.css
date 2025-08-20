@@ -61,6 +61,11 @@ All colors MUST be HSL.
     --sidebar-accent-foreground: 156 45% 25%;
     --sidebar-border: 216 12% 88%;
     --sidebar-ring: 156 45% 55%;
+    
+    /* Shift form colors */
+    --shift-form-background: 159 21% 92%;
+    --shift-form-title: 158 28% 44%;
+    --shift-form-icons: 150 34% 56%;
   }
 
   .dark {
@@ -112,3 +117,5 @@ All colors MUST be HSL.
     font-family: 'Mulish', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
   }
 }
+
+@import url('https://fonts.googleapis.com/css2?family=Mulish:wght@200..1000&display=swap');

@@ -65,8 +65,13 @@ const ShiftPlanningForm = ({ onSubmit, onReset }: ShiftPlanningFormProps) => {
   };
 
   return (
-    <div className="bg-muted/30 rounded-lg p-6 border border-border">
-      <h2 className="text-lg font-medium text-foreground mb-6">Inserimento turno</h2>
+    <div className="rounded-lg p-6 border border-border" style={{ backgroundColor: 'hsl(var(--shift-form-background))' }}>
+      <h2 className="text-lg font-extrabold mb-6" style={{ 
+        color: 'hsl(var(--shift-form-title))', 
+        fontFamily: "'Mulish', sans-serif" 
+      }}>
+        Inserimento turno
+      </h2>
       
       <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -81,7 +86,7 @@ const ShiftPlanningForm = ({ onSubmit, onReset }: ShiftPlanningFormProps) => {
                     !form.watch("date") && "text-muted-foreground"
                   )}
                 >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  <CalendarIcon className="mr-2 h-4 w-4" style={{ color: 'hsl(var(--shift-form-icons))' }} />
                   {form.watch("date") 
                     ? form.watch("date")?.toLocaleDateString('it-IT') 
                     : "Seleziona data"
@@ -182,16 +187,7 @@ const ShiftPlanningForm = ({ onSubmit, onReset }: ShiftPlanningFormProps) => {
                   className="h-4 w-6 p-0 hover:bg-muted"
                   onClick={incrementOperators}
                 >
-                  <ChevronUp className="h-3 w-3" />
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-4 w-6 p-0 hover:bg-muted"
-                  onClick={decrementOperators}
-                >
-                  <ChevronDown className="h-3 w-3" />
+                  <ChevronUp className="h-3 w-3" style={{ color: 'hsl(var(--shift-form-icons))' }} />
                 </Button>
               </div>
             </div>

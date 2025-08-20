@@ -15,28 +15,6 @@ const Header = () => {
         </Link>
         <nav className="flex items-center gap-1">
           <Link
-            to="/"
-            className={cn(
-              "px-4 py-2 text-sm font-medium transition-colors rounded-md",
-              isActive("/") && pathname === "/" 
-                ? "bg-header-foreground/10 text-header-foreground" 
-                : "text-header-foreground/80 hover:text-header-foreground hover:bg-header-foreground/5"
-            )}
-          >
-            DASHBOARD
-          </Link>
-          <Link
-            to="/operators"
-            className={cn(
-              "px-4 py-2 text-sm font-medium transition-colors rounded-md",
-              isActive("/operators") 
-                ? "bg-header-foreground/10 text-header-foreground" 
-                : "text-header-foreground/80 hover:text-header-foreground hover:bg-header-foreground/5"
-            )}
-          >
-            OPERATORI
-          </Link>
-          <Link
             to="/clienti"
             className={cn(
               "px-4 py-2 text-sm font-medium transition-colors rounded-md",
