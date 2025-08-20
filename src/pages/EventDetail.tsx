@@ -276,7 +276,7 @@ const EventDetail = () => {
       {/* Shifts Table */}
       <section>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-extrabold font-mulish mt-6" style={{ color: \'#72AD97\' }}>LISTA TURNI EVENTO</h2>
+          <h2 className="font-bold text-2xl">LISTA TURNI EVENTO</h2>
         </div>
         
         <div className="rounded-lg border border-border overflow-hidden">
