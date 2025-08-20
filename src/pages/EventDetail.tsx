@@ -255,7 +255,7 @@ const EventDetail = () => {
               </div>
               
               <div className="flex items-center gap-3">
-                <Badge className="h-5 w-5 text-muted-foreground" />
+                <Badge className="h-5 w-5" style={{ color: '#72AD97', backgroundColor: 'transparent' }} />
                 <Input
                   value={event.activityCode || ''}
                   onChange={(e) => updateEvent(event.id, { activityCode: e.target.value })}
