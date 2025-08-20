@@ -49,20 +49,6 @@ const ShiftPlanningForm = ({ onSubmit, onReset }: ShiftPlanningFormProps) => {
     onReset?.();
   };
 
-  const incrementOperators = () => {
-    const current = form.getValues("numOperators");
-    if (current < 20) {
-      form.setValue("numOperators", current + 1);
-    }
-  };
-
-  const decrementOperators = () => {
-    const current = form.getValues("numOperators");
-    if (current > 1) {
-      form.setValue("numOperators", current - 1);
-    }
-  };
-
   return (
     <div className="rounded-lg p-6 border border-border mr-[30px]" style={{ backgroundColor: 'hsl(var(--shift-form-background))' }}>
       <h2 className="text-lg font-extrabold mb-6" style={{ 
@@ -179,30 +165,26 @@ const ShiftPlanningForm = ({ onSubmit, onReset }: ShiftPlanningFormProps) => {
                 onChange={(e) => form.setValue("numOperators", parseInt(e.target.value) || 1)}
               />
               <div className="absolute right-1 top-1/2 -translate-y-1/2 flex flex-col">
-                <Button
+                <button
                   type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-5 w-8 p-0 mb-1"
+                  className="h-5 w-8 flex items-center justify-center mb-1"
                   onClick={() => {
                     const current = form.getValues("numOperators");
                     if (current < 20) form.setValue("numOperators", current + 1);
                   }}
                 >
-                  <ChevronUp className="h-3 w-3" />
-                </Button>
-                <Button
+                  <ChevronUp className="h-4 w-4" style={{ color: "#72AD97" }} />
+                </button>
+                <button
                   type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-5 w-8 p-0"
+                  className="h-5 w-8 flex items-center justify-center"
                   onClick={() => {
                     const current = form.getValues("numOperators");
                     if (current > 1) form.setValue("numOperators", current - 1);
                   }}
                 >
-                  <ChevronDown className="h-3 w-3" />
-                </Button>
+                  <ChevronDown className="h-4 w-4" style={{ color: "#72AD97" }} />
+                </button>
               </div>
             </div>
             {form.formState.errors.numOperators && (
