@@ -207,7 +207,7 @@ const EventDetail = () => {
         <div className="flex gap-8">
           {/* Left side - Event details (40%) */}
           <div className="flex-[0_0_40%]">
-            <h1 className="font-bold mb-6 text-3xl text-primary uppercase tracking-wide">{event.title}</h1>
+            <h1 className="mb-6 text-3xl font-extrabold font-mulish" style={{ color: "#72AD97" }}>{event.title}</h1>
             
             {/* Event details under title */}
             <div className="space-y-4">
@@ -276,7 +276,7 @@ const EventDetail = () => {
       {/* Shifts Table */}
       <section>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="font-bold text-2xl">LISTA TURNI EVENTO</h2>
+          <h2 className="mt-6 text-2xl font-extrabold font-mulish" style={{ color: "#72AD97" }}>LISTA TURNI EVENTO</h2>
         </div>
         
         <div className="rounded-lg border border-border overflow-hidden">
