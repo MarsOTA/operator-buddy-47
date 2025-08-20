@@ -245,7 +245,7 @@ const EventDetail = () => {
               </div>
               
               <div className="flex items-center gap-3">
-                <FileText className="h-5 w-5 text-muted-foreground" />
+                <FileText className="h-5 w-5" style={{ color: '#72AD97', backgroundColor: 'transparent' }} />
                 <Input
                   value={event.notes || ''}
                   onChange={(e) => updateEvent(event.id, { notes: e.target.value })}
