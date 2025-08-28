@@ -97,24 +97,47 @@ function Row({ shift, onUpdate }: { shift: Shift; onUpdate: (patch: Partial<Shif
   const operators = clampInt(shift.numOperators ?? 1, 1, 20);
   const operatorHours = isNaN(effectiveHours) ? "0.00" : (effectiveHours * operators).toFixed(2);
 
-  // ✅ Rilevazione "non assegnato" + colore inline sul <tr> (vince su tutte le classi Tailwind)
+  // ✅ Rilevazione "non assegnato" + logica più robusta
   const noName =
     !shift.operator ||
     (typeof shift.operator === "string" && shift.operator.trim() === "") ||
     (typeof shift.operator === "string" && shift.operator.toLowerCase().includes("assegna"));
-  const unassigned = (!shift.operatorId && noName) || shift.phone === "-" || shift.phone === null;
+  
+  const noPhone = !shift.phone || shift.phone === "-" || shift.phone.trim() === "";
+  
+  const unassigned = (!shift.operatorId && noName) || noPhone;
+
+  // Debug: aggiungi questo per vedere cosa sta succedendo
+  console.log('Shift:', shift.id, {
+    operator: shift.operator,
+    operatorId: shift.operatorId,
+    phone: shift.phone,
+    noName,
+    noPhone,
+    unassigned
+  });
 
   return (
     <tr
-      className="[&>td]:px-3 [&>td]:py-2 border-t"
-      style={unassigned ? { backgroundColor: "#FFE0B2" } : undefined} // <-- arancione tenue, inline
+      className={`[&>td]:px-3 [&>td]:py-2 border-t ${
+        unassigned ? '!bg-orange-100 hover:!bg-orange-200' : 'hover:bg-muted/50'
+      }`}
+      style={unassigned ? { 
+        backgroundColor: '#FED7AA !important',
+        '--tw-bg-opacity': '1'
+      } : undefined}
     >
       <td className="whitespace-nowrap">{safeItDate(shift.date)}</td>
       <td className="whitespace-nowrap">{shift.startTime}</td>
       <td className="whitespace-nowrap">{shift.endTime}</td>
       <td className="whitespace-nowrap">{shift.activityType}</td>
-      <td className="whitespace-nowrap">{shift.operator ?? "—"}</td>
-      <td className="whitespace-nowrap">{shift.phone ?? "-"}</td>
+      <td className={`whitespace-nowrap ${unassigned ? 'font-semibold text-orange-800' : ''}`}>
+        {shift.operator ?? "—"}
+        {unassigned && <span className="ml-1 text-xs text-orange-600">(non assegnato)</span>}
+      </td>
+      <td className={`whitespace-nowrap ${unassigned ? 'font-semibold text-orange-800' : ''}`}>
+        {shift.phone ?? "-"}
+      </td>
 
       {/* N° operatori */}
       <td className="whitespace-nowrap">
