@@ -9,7 +9,7 @@ type Shift = {
   activityType: string;
   operator?: string | null;   // es. "Verdi Anna" oppure null
   operatorId?: string | null; // se presente è la chiave operatore
-  phone?: string | null;      // opzionale, usato nella colonna TEL
+  phone?: string | null;      // opzionale per colonna TEL
   pauseHours?: number | null;
   numOperators?: number | null;
 };
@@ -24,7 +24,7 @@ export default function TaskList({ shifts, onUpdateShift }: Props) {
     return <div className="text-sm text-muted-foreground px-2 py-4">Nessun turno inserito.</div>;
   }
 
-  // Totali
+  // Totali (se ti servono in fondo, lasciali; altrimenti puoi rimuovere la sezione <tfoot>)
   const totalEffective = shifts.reduce((sum, s) => {
     const eff = parseFloat(calcEffectiveHours(s.startTime, s.endTime, s.pauseHours ?? 0));
     return sum + (isNaN(eff) ? 0 : eff);
@@ -97,18 +97,18 @@ function Row({ shift, onUpdate }: { shift: Shift; onUpdate: (patch: Partial<Shif
   const operators = clampInt(shift.numOperators ?? 1, 1, 20);
   const operatorHours = isNaN(effectiveHours) ? "0.00" : (effectiveHours * operators).toFixed(2);
 
-  // 🔍 Rileva "non assegnato" in modo robusto
+  // ✅ Rilevazione "non assegnato" + colore inline sul <tr> (vince su tutte le classi Tailwind)
   const noName =
     !shift.operator ||
     (typeof shift.operator === "string" && shift.operator.trim() === "") ||
     (typeof shift.operator === "string" && shift.operator.toLowerCase().includes("assegna"));
   const unassigned = (!shift.operatorId && noName) || shift.phone === "-" || shift.phone === null;
 
-  // 🎨 Forza background su TUTTE le celle della riga non assegnata
-  const rowClass = unassigned ? "[&>td]:bg-orange-100 [&>td]:transition-colors" : "";
-
   return (
-    <tr className={`[&>td]:px-3 [&>td]:py-2 border-t ${rowClass}`}>
+    <tr
+      className="[&>td]:px-3 [&>td]:py-2 border-t"
+      style={unassigned ? { backgroundColor: "#FFE0B2" } : undefined} // <-- arancione tenue, inline
+    >
       <td className="whitespace-nowrap">{safeItDate(shift.date)}</td>
       <td className="whitespace-nowrap">{shift.startTime}</td>
       <td className="whitespace-nowrap">{shift.endTime}</td>
