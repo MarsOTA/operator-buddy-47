@@ -18,37 +18,37 @@ type FormValues = {
   endTime: string;
   activityType: string;
   numOperators: number;
-  pauseHours?: number;
   notes?: string;
 };
 
 interface ShiftPlanningFormProps {
   onSubmit: (values: FormValues) => void;
   onReset?: () => void;
-  eventStartDate?: string; // YYYY-MM-DD
+  /** Data inizio evento, formato YYYY-MM-DD */
+  eventStartDate?: string;
 }
 
 const ShiftPlanningForm = ({ onSubmit, onReset, eventStartDate }: ShiftPlanningFormProps) => {
   const [isOpen, setIsOpen] = useState(false);
 
+  // normalizza l'inizio evento a mezzanotte
   const eventStart = eventStartDate ? startOfDay(new Date(eventStartDate)) : undefined;
 
+  // schema senza "Pausa h."
   const validationSchema = z.object({
-    date: z.date({ required_error: "Seleziona la data del turno" }).refine(
-      (date) => {
-        if (!eventStart) return true;
-        return startOfDay(date) >= eventStart;
-      },
-      { message: "La data del turno deve essere uguale o successiva all’inizio evento" }
-    ),
+    date: z
+      .date({ required_error: "Seleziona la data del turno" })
+      .refine(
+        (date) => {
+          if (!eventStart) return true;
+          return startOfDay(date) >= eventStart;
+        },
+        { message: "La data del turno deve essere uguale o successiva alla data di inizio evento" }
+      ),
     startTime: z.string().min(1, "Seleziona ora di inizio"),
     endTime: z.string().min(1, "Seleziona ora di fine"),
     activityType: z.string().min(1, "Seleziona tipologia attività"),
-    numOperators: z.number().min(1, "Inserisci numero operatori").max(20, "Massimo 20"),
-    pauseHours: z.preprocess(
-      (v) => (v === "" || v === undefined ? 0 : Number(v)),
-      z.number().min(0, "La pausa non può essere negativa")
-    ).optional(),
+    numOperators: z.number().min(1, "Inserisci numero operatori").max(20, "Massimo 20 operatori"),
     notes: z.string().optional(),
   });
 
@@ -60,7 +60,6 @@ const ShiftPlanningForm = ({ onSubmit, onReset, eventStartDate }: ShiftPlanningF
       endTime: "",
       activityType: "",
       numOperators: 1,
-      pauseHours: 0,
       notes: "",
     },
   });
@@ -79,16 +78,21 @@ const ShiftPlanningForm = ({ onSubmit, onReset, eventStartDate }: ShiftPlanningF
 
       <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* Data inizio turno */}
+          {/* Data turno */}
           <div className="space-y-2">
             <Popover open={isOpen} onOpenChange={setIsOpen}>
               <PopoverTrigger asChild>
                 <Button
                   variant="outline"
-                  className={cn("w-full justify-start text-left font-normal h-11", !form.watch("date") && "text-muted-foreground")}
+                  className={cn(
+                    "w-full justify-start text-left font-normal h-11",
+                    !form.watch("date") && "text-muted-foreground"
+                  )}
                 >
                   <CalendarIcon className="mr-2 h-4 w-4" style={{ color: 'hsl(var(--shift-form-icons))' }} />
-                  {form.watch("date") ? form.watch("date")?.toLocaleDateString("it-IT") : "Seleziona data"}
+                  {form.watch("date")
+                    ? form.watch("date")?.toLocaleDateString("it-IT")
+                    : "Seleziona data"}
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start">
@@ -96,15 +100,21 @@ const ShiftPlanningForm = ({ onSubmit, onReset, eventStartDate }: ShiftPlanningF
                   mode="single"
                   selected={form.watch("date")}
                   onSelect={(date) => {
-                    if (date) form.setValue("date", date as Date, { shouldValidate: true });
+                    if (date) {
+                      form.setValue("date", date as Date, { shouldValidate: true });
+                      form.trigger("date");
+                    }
                     setIsOpen(false);
                   }}
-                  fromDate={eventStart}
+                  fromDate={eventStart} // blocca giorni prima dell'inizio evento
                   initialFocus
+                  className="pointer-events-auto"
                 />
               </PopoverContent>
             </Popover>
-            {form.formState.errors.date && <p className="text-sm text-destructive">{form.formState.errors.date.message}</p>}
+            {form.formState.errors.date && (
+              <p className="text-sm text-destructive">{form.formState.errors.date.message}</p>
+            )}
           </div>
 
           {/* Tipologia attività */}
@@ -113,7 +123,7 @@ const ShiftPlanningForm = ({ onSubmit, onReset, eventStartDate }: ShiftPlanningF
               <SelectTrigger className="h-11">
                 <SelectValue placeholder="Seleziona tipologia" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="pointer-events-auto">
                 {ACTIVITY_TYPES.map((type) => (
                   <SelectItem key={type} value={type}>
                     {type}
@@ -121,28 +131,95 @@ const ShiftPlanningForm = ({ onSubmit, onReset, eventStartDate }: ShiftPlanningF
                 ))}
               </SelectContent>
             </Select>
-            {form.formState.errors.activityType && <p className="text-sm text-destructive">{form.formState.errors.activityType.message}</p>}
+            {form.formState.errors.activityType && (
+              <p className="text-sm text-destructive">{form.formState.errors.activityType.message}</p>
+            )}
           </div>
 
           {/* Note */}
           <div className="space-y-2">
-            <Input placeholder="Note per il turno..." className="h-11" {...form.register("notes")} />
+            <Input
+              placeholder="Note per il turno..."
+              className="h-11"
+              {...form.register("notes")}
+            />
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {/* Ora inizio */}
-          <Input type="time" className="h-11" {...form.register("startTime")} />
+          <div className="space-y-2">
+            <Input
+              type="time"
+              placeholder="Ora inizio"
+              className="h-11"
+              {...form.register("startTime")}
+            />
+            {form.formState.errors.startTime && (
+              <p className="text-sm text-destructive">{form.formState.errors.startTime.message}</p>
+            )}
+          </div>
+
           {/* Ora fine */}
-          <Input type="time" className="h-11" {...form.register("endTime")} />
-          {/* N° operatori */}
-          <Input type="number" min="1" max="20" className="h-11 text-center" {...form.register("numOperators", { valueAsNumber: true })} />
-          {/* Pausa h. */}
-          <Input type="number" min="0" step="0.25" className="h-11 text-right" placeholder="Pausa h." {...form.register("pauseHours", { valueAsNumber: true })} />
+          <div className="space-y-2">
+            <Input
+              type="time"
+              placeholder="Ora fine"
+              className="h-11"
+              {...form.register("endTime")}
+            />
+            {form.formState.errors.endTime && (
+              <p className="text-sm text-destructive">{form.formState.errors.endTime.message}</p>
+            )}
+          </div>
+
+          {/* N° operatori (con chevron) */}
+          <div className="space-y-2">
+            <div className="relative">
+              <Input
+                type="number"
+                min="1"
+                max="20"
+                placeholder="N° operatori"
+                className="h-11 text-center pr-10 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                value={form.watch("numOperators")}
+                onChange={(e) => form.setValue("numOperators", parseInt(e.target.value) || 1)}
+              />
+              <div className="absolute right-1 top-1/2 -translate-y-1/2 flex flex-col">
+                <button
+                  type="button"
+                  className="h-5 w-8 flex items-center justify-center mb-1"
+                  onClick={() => {
+                    const current = form.getValues("numOperators");
+                    if (current < 20) form.setValue("numOperators", current + 1);
+                  }}
+                >
+                  <ChevronUp className="h-4 w-4" style={{ color: "#72AD97" }} />
+                </button>
+                <button
+                  type="button"
+                  className="h-5 w-8 flex items-center justify-center"
+                  onClick={() => {
+                    const current = form.getValues("numOperators");
+                    if (current > 1) form.setValue("numOperators", current - 1);
+                  }}
+                >
+                  <ChevronDown className="h-4 w-4" style={{ color: "#72AD97" }} />
+                </button>
+              </div>
+            </div>
+            {form.formState.errors.numOperators && (
+              <p className="text-sm text-destructive">{form.formState.errors.numOperators.message}</p>
+            )}
+          </div>
         </div>
 
+        {/* Submit */}
         <div className="pt-4">
-          <Button type="submit" className="w-full h-12 text-base font-medium">
+          <Button
+            type="submit"
+            className="w-full bg-primary hover:bg-primary/90 text-primary-foreground h-12 text-base font-medium"
+          >
             Aggiungi turno
           </Button>
         </div>
