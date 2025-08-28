@@ -15,7 +15,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { cn } from "@/lib/utils";
+import { cn, formatDateToDDMMYY, parseDateFromDDMMYY } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 
 const EventDetail = () => {
@@ -48,6 +48,7 @@ const EventDetail = () => {
   const [lunchBreakHours, setLunchBreakHours] = useState<Record<string, string>>({});
   const [emailModalOpen, setEmailModalOpen] = useState(false);
   const [selectedShiftForEmail, setSelectedShiftForEmail] = useState<any>(null);
+  const [notePopoverOpen, setNotePopoverOpen] = useState<Record<string, boolean>>({});
   const { toast } = useToast();
 
   // Inline editing states
@@ -64,9 +65,13 @@ const EventDetail = () => {
     if (field === 'address') {
       updateEvent(event.id, { address: value });
     } else if (field === 'startDate') {
-      updateEvent(event.id, { startDate: value });
+      // Convert DD/MM/YY to YYYY-MM-DD for storage
+      const isoDate = parseDateFromDDMMYY(value);
+      updateEvent(event.id, { startDate: isoDate });
     } else if (field === 'endDate') {
-      updateEvent(event.id, { endDate: value });
+      // Convert DD/MM/YY to YYYY-MM-DD for storage
+      const isoDate = parseDateFromDDMMYY(value);
+      updateEvent(event.id, { endDate: isoDate });
     } else if (field === 'activityCode') {
       updateEvent(event.id, { activityCode: value });
     } else if (field === 'notes') {
@@ -159,11 +164,17 @@ const EventDetail = () => {
     }
     setEditingNotes(null);
     setTempNotes("");
+    // Close the popover
+    setNotePopoverOpen(prev => ({ ...prev, [noteKey]: false }));
   };
 
-  const handleCancelEditNotes = () => {
+  const handleCancelEditNotes = (noteKey?: string) => {
     setTempNotes("");
     setEditingNotes(null);
+    // Close the popover if noteKey is provided
+    if (noteKey) {
+      setNotePopoverOpen(prev => ({ ...prev, [noteKey]: false }));
+    }
   };
 
   const handleToggleTeamLeader = (shiftId: string, operatorId: string, isCurrentLeader: boolean) => {
@@ -322,61 +333,63 @@ const EventDetail = () => {
                 <div className="flex-1">
                   <div className="flex gap-2 items-center">
                     {/* Start Date */}
-                    <div className="flex items-center gap-2">
-                      {editingField === 'startDate' ? (
-                        <>
-                          <Input
-                            type="date"
-                            value={tempValues.startDate || ''}
-                            onChange={(e) => setTempValues({ ...tempValues, startDate: e.target.value })}
-                            className="h-10 border-0 border-b border-border/30 rounded-none focus:border-primary bg-transparent"
-                            autoFocus
-                          />
-                          <Button variant="ghost" size="sm" onClick={() => handleSaveField('startDate')}>
-                            <Save className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="sm" onClick={handleCancelEdit}>
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </>
-                      ) : (
-                        <>
-                          <span className="py-2">{event.startDate || 'Data non specificata'}</span>
-                          <Button variant="ghost" size="sm" onClick={() => handleStartEdit('startDate', event.startDate)}>
-                            <Edit2 className="h-4 w-4" />
-                          </Button>
-                        </>
-                      )}
+                       <div className="flex items-center gap-2">
+                       {editingField === 'startDate' ? (
+                         <>
+                           <Input
+                             type="text"
+                             placeholder="GG/MM/AA"
+                             value={tempValues.startDate || ''}
+                             onChange={(e) => setTempValues({ ...tempValues, startDate: e.target.value })}
+                             className="h-10 border-0 border-b border-border/30 rounded-none focus:border-primary bg-transparent"
+                             autoFocus
+                           />
+                           <Button variant="ghost" size="sm" onClick={() => handleSaveField('startDate')}>
+                             <Save className="h-4 w-4" />
+                           </Button>
+                           <Button variant="ghost" size="sm" onClick={handleCancelEdit}>
+                             <X className="h-4 w-4" />
+                           </Button>
+                         </>
+                       ) : (
+                         <>
+                           <span className="py-2">{formatDateToDDMMYY(event.startDate) || 'Data non specificata'}</span>
+                           <Button variant="ghost" size="sm" onClick={() => handleStartEdit('startDate', formatDateToDDMMYY(event.startDate))}>
+                             <Edit2 className="h-4 w-4" />
+                           </Button>
+                         </>
+                       )}
                     </div>
                     
                     <span className="text-muted-foreground">al</span>
                     
                     {/* End Date */}
-                    <div className="flex items-center gap-2">
-                      {editingField === 'endDate' ? (
-                        <>
-                          <Input
-                            type="date"
-                            value={tempValues.endDate || ''}
-                            onChange={(e) => setTempValues({ ...tempValues, endDate: e.target.value })}
-                            className="h-10 border-0 border-b border-border/30 rounded-none focus:border-primary bg-transparent"
-                            autoFocus
-                          />
-                          <Button variant="ghost" size="sm" onClick={() => handleSaveField('endDate')}>
-                            <Save className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="sm" onClick={handleCancelEdit}>
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </>
-                      ) : (
-                        <>
-                          <span className="py-2">{event.endDate || 'Data non specificata'}</span>
-                          <Button variant="ghost" size="sm" onClick={() => handleStartEdit('endDate', event.endDate)}>
-                            <Edit2 className="h-4 w-4" />
-                          </Button>
-                        </>
-                      )}
+                     <div className="flex items-center gap-2">
+                       {editingField === 'endDate' ? (
+                         <>
+                           <Input
+                             type="text"
+                             placeholder="GG/MM/AA"
+                             value={tempValues.endDate || ''}
+                             onChange={(e) => setTempValues({ ...tempValues, endDate: e.target.value })}
+                             className="h-10 border-0 border-b border-border/30 rounded-none focus:border-primary bg-transparent"
+                             autoFocus
+                           />
+                           <Button variant="ghost" size="sm" onClick={() => handleSaveField('endDate')}>
+                             <Save className="h-4 w-4" />
+                           </Button>
+                           <Button variant="ghost" size="sm" onClick={handleCancelEdit}>
+                             <X className="h-4 w-4" />
+                           </Button>
+                         </>
+                       ) : (
+                         <>
+                           <span className="py-2">{formatDateToDDMMYY(event.endDate) || 'Data non specificata'}</span>
+                           <Button variant="ghost" size="sm" onClick={() => handleStartEdit('endDate', formatDateToDDMMYY(event.endDate))}>
+                             <Edit2 className="h-4 w-4" />
+                           </Button>
+                         </>
+                       )}
                     </div>
                   </div>
                 </div>
@@ -655,62 +668,62 @@ const EventDetail = () => {
                     ) : "-"}
                   </TableCell>
                   <TableCell>
-                    <div className="flex items-center justify-center">
-                      {(slotNotes[`${row.id}-${row.slotIndex}`] || row.notes) ? (
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <Button 
-                              variant="ghost" 
-                              size="sm" 
-                              className="h-8 w-8 p-0"
-                              aria-label="Visualizza/modifica note"
-                            >
-                              <StickyNote className="h-4 w-4 text-primary" />
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-80 pointer-events-auto" align="center">
-                            <div className="space-y-4">
-                              <h4 className="font-medium">Note del turno</h4>
-                              <div className="space-y-2">
-                                <Label htmlFor="note-edit">Contenuto</Label>
-                                <Textarea
-                                  id="note-edit"
-                                  value={tempNotes || slotNotes[`${row.id}-${row.slotIndex}`] || row.notes || ""}
-                                  onChange={(e) => setTempNotes(e.target.value)}
-                                  placeholder="Inserisci note per il turno..."
-                                  className="min-h-[80px]"
-                                  onFocus={() => {
-                                    if (!tempNotes) {
-                                      setTempNotes(slotNotes[`${row.id}-${row.slotIndex}`] || row.notes || "");
-                                    }
-                                  }}
-                                />
-                              </div>
-                              <div className="flex justify-end gap-2">
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => {
-                                    setTempNotes("");
-                                    setEditingNotes(null);
-                                  }}
-                                  type="button"
-                                >
-                                  <X className="h-4 w-4 mr-1" />
-                                  Annulla
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  onClick={() => handleSaveNotes(`${row.id}-${row.slotIndex}`)}
-                                  type="button"
-                                >
-                                  <Save className="h-4 w-4 mr-1" />
-                                  Salva
-                                </Button>
-                              </div>
-                            </div>
-                          </PopoverContent>
-                        </Popover>
+                     <div className="flex items-center justify-center">
+                       {(slotNotes[`${row.id}-${row.slotIndex}`] || row.notes) ? (
+                         <Popover 
+                           open={notePopoverOpen[`${row.id}-${row.slotIndex}`]} 
+                           onOpenChange={(open) => setNotePopoverOpen(prev => ({ ...prev, [`${row.id}-${row.slotIndex}`]: open }))}
+                         >
+                           <PopoverTrigger asChild>
+                             <Button 
+                               variant="ghost" 
+                               size="sm" 
+                               className="h-8 w-8 p-0"
+                               aria-label="Visualizza/modifica note"
+                             >
+                               <StickyNote className="h-4 w-4 text-primary" />
+                             </Button>
+                           </PopoverTrigger>
+                           <PopoverContent className="w-80 pointer-events-auto" align="center">
+                             <div className="space-y-4">
+                               <h4 className="font-medium">Note del turno</h4>
+                               <div className="space-y-2">
+                                 <Label htmlFor="note-edit">Contenuto</Label>
+                                 <Textarea
+                                   id="note-edit"
+                                   value={tempNotes || slotNotes[`${row.id}-${row.slotIndex}`] || row.notes || ""}
+                                   onChange={(e) => setTempNotes(e.target.value)}
+                                   placeholder="Inserisci note per il turno..."
+                                   className="min-h-[80px]"
+                                   onFocus={() => {
+                                     if (!tempNotes) {
+                                       setTempNotes(slotNotes[`${row.id}-${row.slotIndex}`] || row.notes || "");
+                                     }
+                                   }}
+                                 />
+                               </div>
+                               <div className="flex justify-end gap-2">
+                                 <Button
+                                   variant="outline"
+                                   size="sm"
+                                   onClick={() => handleCancelEditNotes(`${row.id}-${row.slotIndex}`)}
+                                   type="button"
+                                 >
+                                   <X className="h-4 w-4 mr-1" />
+                                   Annulla
+                                 </Button>
+                                 <Button
+                                   size="sm"
+                                   onClick={() => handleSaveNotes(`${row.id}-${row.slotIndex}`)}
+                                   type="button"
+                                 >
+                                   <Save className="h-4 w-4 mr-1" />
+                                   Salva
+                                 </Button>
+                               </div>
+                             </div>
+                           </PopoverContent>
+                         </Popover>
                       ) : (
                         <Button 
                           variant="ghost" 
@@ -803,7 +816,7 @@ const EventDetail = () => {
               autoFocus
             />
             <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={handleCancelEditNotes}>
+              <Button variant="outline" onClick={() => handleCancelEditNotes()}>
                 Annulla
               </Button>
               <Button onClick={() => editingNotes && handleSaveNotes(editingNotes)}>

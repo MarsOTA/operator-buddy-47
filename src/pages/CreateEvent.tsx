@@ -12,6 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/hooks/use-toast";
 import { Users, Clock, Calendar } from "lucide-react";
+import { formatDateToDDMMYY, parseDateFromDDMMYY } from "@/lib/utils";
 
 const FormSchema = z.object({
   clientId: z.string().min(1, "Seleziona un cliente"),
@@ -46,11 +47,19 @@ const CreateEvent = () => {
     const clientName = clients.find((c) => c.id === values.clientId)?.name || "Cliente";
     const brandName = brands.find((b) => b.id === values.brandId)?.name || "Brand";
     const title = `${brandName} - ${clientName}`;
+    
+    // Convert DD/MM/YY dates to YYYY-MM-DD format for storage
+    const startDateISO = parseDateFromDDMMYY(values.startDate);
+    const endDateISO = parseDateFromDDMMYY(values.endDate);
+    
     const ev = createEvent({ 
       title, 
       clientId: values.clientId, 
       brandId: values.brandId, 
-      address: values.address 
+      address: values.address,
+      startDate: startDateISO,
+      endDate: endDateISO,
+      notes: values.notes
     });
 
     toast({ title: "Evento creato", description: `${title} salvato correttamente` });
@@ -139,29 +148,31 @@ const CreateEvent = () => {
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <Label className="text-sm font-medium">Data Inizio Evento</Label>
-                      <Input
-                        type="date"
-                        className="h-11"
-                        {...form.register("startDate")}
-                      />
-                      {form.formState.errors.startDate && (
-                        <p className="text-sm text-destructive">{form.formState.errors.startDate.message}</p>
-                      )}
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label className="text-sm font-medium">Data Fine Evento</Label>
-                      <Input
-                        type="date"
-                        className="h-11"
-                        {...form.register("endDate")}
-                      />
-                      {form.formState.errors.endDate && (
-                        <p className="text-sm text-destructive">{form.formState.errors.endDate.message}</p>
-                      )}
-                    </div>
+                     <div className="space-y-2">
+                       <Label className="text-sm font-medium">Data Inizio Evento</Label>
+                       <Input
+                         type="text"
+                         placeholder="GG/MM/AA"
+                         className="h-11"
+                         {...form.register("startDate")}
+                       />
+                       {form.formState.errors.startDate && (
+                         <p className="text-sm text-destructive">{form.formState.errors.startDate.message}</p>
+                       )}
+                     </div>
+                     
+                     <div className="space-y-2">
+                       <Label className="text-sm font-medium">Data Fine Evento</Label>
+                       <Input
+                         type="text"
+                         placeholder="GG/MM/AA"
+                         className="h-11"
+                         {...form.register("endDate")}
+                       />
+                       {form.formState.errors.endDate && (
+                         <p className="text-sm text-destructive">{form.formState.errors.endDate.message}</p>
+                       )}
+                     </div>
                   </div>
 
                   <div className="space-y-2">
