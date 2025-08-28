@@ -3,11 +3,11 @@ import { Input } from "@/components/ui/input";
 
 type Shift = {
   id: string;
-  date: string;          // ISO yyyy-mm-dd
-  startTime: string;     // HH:mm
-  endTime: string;       // HH:mm
+  date: string;
+  startTime: string;
+  endTime: string;
   activityType: string;
-  operator?: string | null;   // se manca → riga arancione
+  operator?: string | null;
   pauseHours?: number | null;
   numOperators?: number | null;
 };
@@ -21,18 +21,6 @@ export default function TaskList({ shifts, onUpdateShift }: Props) {
   if (!shifts?.length) {
     return <div className="text-sm text-muted-foreground px-2 py-4">Nessun turno inserito.</div>;
   }
-
-  const totalEffective = shifts.reduce((sum, s) => {
-    const eff = parseFloat(calcEffectiveHours(s.startTime, s.endTime, s.pauseHours ?? 0));
-    return sum + (isNaN(eff) ? 0 : eff);
-  }, 0);
-
-  const totalOperatorHours = shifts.reduce((sum, s) => {
-    const eff = parseFloat(calcEffectiveHours(s.startTime, s.endTime, s.pauseHours ?? 0));
-    const ops = clampInt(s.numOperators ?? 1, 1, 20);
-    const row = (isNaN(eff) ? 0 : eff) * ops;
-    return sum + row;
-  }, 0);
 
   return (
     <div className="overflow-x-auto rounded-md border">
@@ -56,14 +44,6 @@ export default function TaskList({ shifts, onUpdateShift }: Props) {
             <Row key={s.id} shift={s} onUpdate={(patch) => onUpdateShift(s.id, patch)} />
           ))}
         </tbody>
-        <tfoot className="bg-muted/30 font-semibold">
-          <tr>
-            <td colSpan={7} className="px-3 py-2 text-right">Totali:</td>
-            <td className="px-3 py-2">{totalEffective.toFixed(2)}</td>
-            <td className="px-3 py-2">{totalOperatorHours.toFixed(2)}</td>
-            <td />
-          </tr>
-        </tfoot>
       </table>
     </div>
   );
@@ -98,20 +78,18 @@ function Row({ shift, onUpdate }: { shift: Shift; onUpdate: (patch: Partial<Shif
   const operators = clampInt(shift.numOperators ?? 1, 1, 20);
   const operatorHours = isNaN(effectiveHours) ? "0.00" : (effectiveHours * operators).toFixed(2);
 
-  // se non c'è operatore → arancione visibile su OGNI cella + bordo inferiore
-  const unassigned = !shift.operator;
-  const cellStyle = unassigned ? { backgroundColor: "#FFE0B2" } as React.CSSProperties : undefined;
-  const cellClass = unassigned ? "border-b-2 border-orange-300" : "";
+  // se manca l’operatore → evidenzia celle in arancione tenue
+  const cellStyle = !shift.operator ? { backgroundColor: "#FFE0B2" } : undefined;
 
   return (
     <tr className="[&>td]:px-3 [&>td]:py-2 border-t">
-      <td style={cellStyle} className={`whitespace-nowrap ${cellClass}`}>{safeItDate(shift.date)}</td>
-      <td style={cellStyle} className={`whitespace-nowrap ${cellClass}`}>{shift.startTime}</td>
-      <td style={cellStyle} className={`whitespace-nowrap ${cellClass}`}>{shift.endTime}</td>
-      <td style={cellStyle} className={`whitespace-nowrap ${cellClass}`}>{shift.activityType}</td>
-      <td style={cellStyle} className={`whitespace-nowrap ${cellClass}`}>{shift.operator ?? "—"}</td>
+      <td style={cellStyle}>{safeItDate(shift.date)}</td>
+      <td style={cellStyle}>{shift.startTime}</td>
+      <td style={cellStyle}>{shift.endTime}</td>
+      <td style={cellStyle}>{shift.activityType}</td>
+      <td style={cellStyle}>{shift.operator ?? "—"}</td>
 
-      <td style={cellStyle} className={`whitespace-nowrap ${cellClass}`}>
+      <td style={cellStyle}>
         <Input
           type="number"
           min={1}
@@ -121,13 +99,11 @@ function Row({ shift, onUpdate }: { shift: Shift; onUpdate: (patch: Partial<Shif
           value={opsVal}
           onChange={(e) => setOpsVal(e.target.value)}
           onBlur={commitOps}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-          }}
+          onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
         />
       </td>
 
-      <td style={cellStyle} className={`whitespace-nowrap ${cellClass}`}>
+      <td style={cellStyle}>
         <Input
           type="number"
           min="0"
@@ -136,15 +112,13 @@ function Row({ shift, onUpdate }: { shift: Shift; onUpdate: (patch: Partial<Shif
           value={pauseVal}
           onChange={(e) => setPauseVal(e.target.value)}
           onBlur={commitPause}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-          }}
+          onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
         />
       </td>
 
-      <td style={cellStyle} className={`whitespace-nowrap ${cellClass}`}>{effectiveHoursStr}</td>
-      <td style={cellStyle} className={`whitespace-nowrap ${cellClass}`}>{operatorHours}</td>
-      <td style={cellStyle} className={`text-right ${cellClass}`}>{/* pulsanti azioni esistenti */}</td>
+      <td style={cellStyle}>{effectiveHoursStr}</td>
+      <td style={cellStyle}>{operatorHours}</td>
+      <td style={cellStyle} className="text-right">{/* pulsanti azioni */}</td>
     </tr>
   );
 }
