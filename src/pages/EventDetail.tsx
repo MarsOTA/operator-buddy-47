@@ -45,6 +45,7 @@ const EventDetail = () => {
   const [slotTimes, setSlotTimes] = useState<Record<string, { startTime: string; endTime: string }>>({});
   const [editingPhones, setEditingPhones] = useState<Record<string, string>>({});
   const [slotNotes, setSlotNotes] = useState<Record<string, string>>({});
+  const [lunchBreakHours, setLunchBreakHours] = useState<Record<string, string>>({});
   const [emailModalOpen, setEmailModalOpen] = useState(false);
   const [selectedShiftForEmail, setSelectedShiftForEmail] = useState<any>(null);
   const { toast } = useToast();
@@ -68,6 +69,8 @@ const EventDetail = () => {
       updateEvent(event.id, { endDate: value });
     } else if (field === 'activityCode') {
       updateEvent(event.id, { activityCode: value });
+    } else if (field === 'notes') {
+      updateEvent(event.id, { notes: value });
     }
     setEditingField(null);
   };
@@ -410,16 +413,41 @@ const EventDetail = () => {
                 </div>
               </div>
 
-              {/* Event Notes - displayed if present */}
-              {event.notes && (
-                <div className="flex items-start gap-3 mt-4 p-3 bg-muted/50 rounded-md">
-                  <StickyNote className="h-5 w-5 mt-0.5" style={{ color: '#72AD97', backgroundColor: 'transparent' }} />
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-muted-foreground mb-1">Note evento:</p>
-                    <p className="text-sm">{event.notes}</p>
-                  </div>
+              {/* Event Notes field */}
+              <div className="flex items-start gap-3">
+                <StickyNote className="h-5 w-5 mt-2" style={{ color: '#72AD97', backgroundColor: 'transparent' }} />
+                <div className="flex-1 flex flex-col gap-2">
+                  <Label className="text-sm font-medium">Note evento:</Label>
+                  {editingField === 'notes' ? (
+                    <div className="flex flex-col gap-2">
+                      <Textarea
+                        value={tempValues.notes || ''}
+                        onChange={(e) => setTempValues({ ...tempValues, notes: e.target.value })}
+                        className="min-h-[80px] border-0 border-b border-border/30 rounded-none focus:border-primary bg-transparent"
+                        placeholder="Inserisci note per l'evento..."
+                        autoFocus
+                      />
+                      <div className="flex gap-2">
+                        <Button variant="ghost" size="sm" onClick={() => handleSaveField('notes')}>
+                          <Save className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={handleCancelEdit}>
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-start gap-2">
+                      <div className="flex-1 py-2 min-h-[40px] text-sm">
+                        {event.notes || 'Nessuna nota inserita'}
+                      </div>
+                      <Button variant="ghost" size="sm" onClick={() => handleStartEdit('notes', event.notes)}>
+                        <Edit2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  )}
                 </div>
-              )}
+              </div>
             </div>
           </div>
 
@@ -480,6 +508,7 @@ const EventDetail = () => {
                     {sort.key !== 'hours' ? <ArrowUpDown className="h-4 w-4 text-muted-foreground" /> : (sort.dir === 'asc' ? <ArrowUp className="h-4 w-4 text-muted-foreground" /> : <ArrowDown className="h-4 w-4 text-muted-foreground" />)}
                   </Button>
                 </TableHead>
+                <TableHead>PAUSA H.</TableHead>
                 <TableHead>TL</TableHead>
                 <TableHead>NOTE</TableHead>
                 <TableHead>AZIONI</TableHead>
@@ -600,6 +629,21 @@ const EventDetail = () => {
                         slotTimes[`${row.id}-${row.slotIndex}`]?.endTime || row.endTime
                       )}h
                     </span>
+                  </TableCell>
+                  <TableCell>
+                    <Input
+                      type="number"
+                      min="0"
+                      max="8"
+                      step="0.5"
+                      value={lunchBreakHours[`${row.id}-${row.slotIndex}`] || ''}
+                      onChange={(e) => setLunchBreakHours(prev => ({ 
+                        ...prev, 
+                        [`${row.id}-${row.slotIndex}`]: e.target.value
+                      }))}
+                      placeholder="0"
+                      className="h-8 text-sm w-16 text-center"
+                    />
                   </TableCell>
                   <TableCell>
                     {row.isAssigned ? (
@@ -731,7 +775,7 @@ const EventDetail = () => {
               ))}
               {sortedShifts.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={11} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={12} className="text-center text-muted-foreground py-8">
                     Nessun turno pianificato. Crea il primo turno.
                   </TableCell>
                 </TableRow>
