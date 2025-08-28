@@ -11,37 +11,43 @@ import { Textarea } from "@/components/ui/textarea";
 import { CalendarIcon, ChevronUp, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ACTIVITY_TYPES, type ActivityType } from "@/store/appStore";
+import { startOfDay } from "date-fns";
 
-const FormSchema = z.object({
-  date: z.date({ required_error: "Seleziona la data del turno" }),
-  startTime: z.string().min(1, "Seleziona ora di inizio"),
-  endTime: z.string().min(1, "Seleziona ora di fine"),
-  activityType: z.string().min(1, "Seleziona tipologia attività"),
-  numOperators: z.number().min(1, "Inserisci numero operatori").max(20, "Massimo 20 operatori"),
-  notes: z.string().optional(),
-});
-
-type FormValues = z.infer<typeof FormSchema>;
+type FormValues = {
+  date: Date | undefined;
+  startTime: string;
+  endTime: string;
+  activityType: string;
+  numOperators: number;
+  notes?: string;
+};
 
 interface ShiftPlanningFormProps {
   onSubmit: (values: FormValues) => void;
   onReset?: () => void;
-  eventStartDate?: string; // YYYY-MM-DD format
+  /** Data inizio evento, formato YYYY-MM-DD */
+  eventStartDate?: string;
 }
 
 const ShiftPlanningForm = ({ onSubmit, onReset, eventStartDate }: ShiftPlanningFormProps) => {
   const [isOpen, setIsOpen] = useState(false);
-  
-  // Create validation schema with event date constraint
+
+  // Normalizza la data di inizio evento a mezzanotte (evita problemi di timezone/orari)
+  const eventStart = eventStartDate ? startOfDay(new Date(eventStartDate)) : undefined;
+
+  // Schema con vincolo: data turno >= data inizio evento
   const validationSchema = z.object({
-    date: z.date({ required_error: "Seleziona la data del turno" })
-      .refine((date) => {
-        if (!eventStartDate) return true;
-        const eventStart = new Date(eventStartDate);
-        return date >= eventStart;
-      }, {
-        message: "La data del turno non può essere antecedente alla data di inizio evento"
-      }),
+    date: z
+      .date({ required_error: "Seleziona la data del turno" })
+      .refine(
+        (date) => {
+          if (!eventStart) return true;
+          return startOfDay(date) >= eventStart;
+        },
+        {
+          message: "La data del turno deve essere uguale o successiva alla data di inizio evento",
+        }
+      ),
     startTime: z.string().min(1, "Seleziona ora di inizio"),
     endTime: z.string().min(1, "Seleziona ora di fine"),
     activityType: z.string().min(1, "Seleziona tipologia attività"),
@@ -101,9 +107,13 @@ const ShiftPlanningForm = ({ onSubmit, onReset, eventStartDate }: ShiftPlanningF
                   mode="single"
                   selected={form.watch("date")}
                   onSelect={(date) => {
-                    form.setValue("date", date as Date);
+                    if (date) {
+                      form.setValue("date", date as Date, { shouldValidate: true });
+                      form.trigger("date"); // valida subito per mostrare l'errore se < inizio evento
+                    }
                     setIsOpen(false);
                   }}
+                  fromDate={eventStart} // blocca selezioni precedenti all'inizio evento
                   initialFocus
                   className="pointer-events-auto"
                 />
@@ -170,7 +180,7 @@ const ShiftPlanningForm = ({ onSubmit, onReset, eventStartDate }: ShiftPlanningF
             )}
           </div>
 
-          {/* N°operatori */}
+          {/* N° operatori */}
           <div className="space-y-2">
             <div className="relative">
               <Input
