@@ -119,3 +119,12 @@ All colors MUST be HSL.
 }
 
 @import url('https://fonts.googleapis.com/css2?family=Mulish:wght@200..1000&display=swap');
+/* Evidenzia le righe dei turni non assegnati (bottone Assegna con icona user-plus) */
+tbody tr:has(td svg[data-lucide="user-plus"]) > td {
+  background-color: #FFE0B2 !important; /* arancione tenue */
+}
+
+tbody tr:has(td svg[data-lucide="user-plus"]) {
+  outline: 1px solid rgba(255, 138, 76, 0.25);
+  outline-offset: -1px;
+}
