@@ -3,11 +3,13 @@ import { Input } from "@/components/ui/input";
 
 type Shift = {
   id: string;
-  date: string;
-  startTime: string;
-  endTime: string;
+  date: string;               // ISO yyyy-mm-dd
+  startTime: string;          // HH:mm
+  endTime: string;            // HH:mm
   activityType: string;
-  operator?: string | null;
+  operator?: string | null;   // es. "Verdi Anna" oppure null
+  operatorId?: string | null; // se presente è la chiave operatore
+  phone?: string | null;      // opzionale, usato nella colonna TEL
   pauseHours?: number | null;
   numOperators?: number | null;
 };
@@ -22,6 +24,18 @@ export default function TaskList({ shifts, onUpdateShift }: Props) {
     return <div className="text-sm text-muted-foreground px-2 py-4">Nessun turno inserito.</div>;
   }
 
+  // Totali
+  const totalEffective = shifts.reduce((sum, s) => {
+    const eff = parseFloat(calcEffectiveHours(s.startTime, s.endTime, s.pauseHours ?? 0));
+    return sum + (isNaN(eff) ? 0 : eff);
+  }, 0);
+
+  const totalOperatorHours = shifts.reduce((sum, s) => {
+    const eff = parseFloat(calcEffectiveHours(s.startTime, s.endTime, s.pauseHours ?? 0));
+    const ops = clampInt(s.numOperators ?? 1, 1, 20);
+    return sum + (isNaN(eff) ? 0 : eff) * ops;
+  }, 0);
+
   return (
     <div className="overflow-x-auto rounded-md border">
       <table className="w-full text-sm">
@@ -32,6 +46,7 @@ export default function TaskList({ shifts, onUpdateShift }: Props) {
             <th>Ora fine</th>
             <th>Tipologia attività</th>
             <th>Operatore</th>
+            <th>TEL</th>
             <th>N° operatori</th>
             <th>Pausa h.</th>
             <th>Ore effettive</th>
@@ -44,6 +59,14 @@ export default function TaskList({ shifts, onUpdateShift }: Props) {
             <Row key={s.id} shift={s} onUpdate={(patch) => onUpdateShift(s.id, patch)} />
           ))}
         </tbody>
+        <tfoot className="bg-muted/30 font-semibold">
+          <tr>
+            <td colSpan={8} className="px-3 py-2 text-right">Totali:</td>
+            <td className="px-3 py-2">{totalEffective.toFixed(2)}</td>
+            <td className="px-3 py-2">{totalOperatorHours.toFixed(2)}</td>
+            <td />
+          </tr>
+        </tfoot>
       </table>
     </div>
   );
@@ -54,23 +77,19 @@ function Row({ shift, onUpdate }: { shift: Shift; onUpdate: (patch: Partial<Shif
   const [opsVal, setOpsVal] = useState<string>(String(clampInt(shift.numOperators ?? 1, 1, 20)));
 
   const commitPause = () => {
-    const n = Number(pauseVal.replace(",", "."));
+    const n = Number(String(pauseVal).replace(",", "."));
     if (isNaN(n) || n < 0) {
       setPauseVal((shift.pauseHours ?? 0).toString());
       return;
     }
-    if (n !== (shift.pauseHours ?? 0)) {
-      onUpdate({ pauseHours: n });
-    }
+    if (n !== (shift.pauseHours ?? 0)) onUpdate({ pauseHours: n });
   };
 
   const commitOps = () => {
     const n = clampInt(parseInt(opsVal || "1", 10), 1, 20);
     const current = clampInt(shift.numOperators ?? 1, 1, 20);
     setOpsVal(String(n));
-    if (n !== current) {
-      onUpdate({ numOperators: n });
-    }
+    if (n !== current) onUpdate({ numOperators: n });
   };
 
   const effectiveHoursStr = calcEffectiveHours(shift.startTime, shift.endTime, shift.pauseHours ?? 0);
@@ -78,18 +97,27 @@ function Row({ shift, onUpdate }: { shift: Shift; onUpdate: (patch: Partial<Shif
   const operators = clampInt(shift.numOperators ?? 1, 1, 20);
   const operatorHours = isNaN(effectiveHours) ? "0.00" : (effectiveHours * operators).toFixed(2);
 
-  // se manca l’operatore → evidenzia celle in arancione tenue
-  const cellStyle = !shift.operator ? { backgroundColor: "#FFE0B2" } : undefined;
+  // 🔍 Rileva "non assegnato" in modo robusto
+  const noName =
+    !shift.operator ||
+    (typeof shift.operator === "string" && shift.operator.trim() === "") ||
+    (typeof shift.operator === "string" && shift.operator.toLowerCase().includes("assegna"));
+  const unassigned = (!shift.operatorId && noName) || shift.phone === "-" || shift.phone === null;
+
+  // 🎨 Forza background su TUTTE le celle della riga non assegnata
+  const rowClass = unassigned ? "[&>td]:bg-orange-100 [&>td]:transition-colors" : "";
 
   return (
-    <tr className="[&>td]:px-3 [&>td]:py-2 border-t">
-      <td style={cellStyle}>{safeItDate(shift.date)}</td>
-      <td style={cellStyle}>{shift.startTime}</td>
-      <td style={cellStyle}>{shift.endTime}</td>
-      <td style={cellStyle}>{shift.activityType}</td>
-      <td style={cellStyle}>{shift.operator ?? "—"}</td>
+    <tr className={`[&>td]:px-3 [&>td]:py-2 border-t ${rowClass}`}>
+      <td className="whitespace-nowrap">{safeItDate(shift.date)}</td>
+      <td className="whitespace-nowrap">{shift.startTime}</td>
+      <td className="whitespace-nowrap">{shift.endTime}</td>
+      <td className="whitespace-nowrap">{shift.activityType}</td>
+      <td className="whitespace-nowrap">{shift.operator ?? "—"}</td>
+      <td className="whitespace-nowrap">{shift.phone ?? "-"}</td>
 
-      <td style={cellStyle}>
+      {/* N° operatori */}
+      <td className="whitespace-nowrap">
         <Input
           type="number"
           min={1}
@@ -103,7 +131,8 @@ function Row({ shift, onUpdate }: { shift: Shift; onUpdate: (patch: Partial<Shif
         />
       </td>
 
-      <td style={cellStyle}>
+      {/* Pausa h. */}
+      <td className="whitespace-nowrap">
         <Input
           type="number"
           min="0"
@@ -116,9 +145,9 @@ function Row({ shift, onUpdate }: { shift: Shift; onUpdate: (patch: Partial<Shif
         />
       </td>
 
-      <td style={cellStyle}>{effectiveHoursStr}</td>
-      <td style={cellStyle}>{operatorHours}</td>
-      <td style={cellStyle} className="text-right">{/* pulsanti azioni */}</td>
+      <td className="whitespace-nowrap">{effectiveHoursStr}</td>
+      <td className="whitespace-nowrap">{operatorHours}</td>
+      <td className="text-right">{/* pulsanti azioni esistenti */}</td>
     </tr>
   );
 }
