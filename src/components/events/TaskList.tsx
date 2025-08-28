@@ -98,12 +98,82 @@ function Row({ shift, onUpdate }: { shift: Shift; onUpdate: (patch: Partial<Shif
   const operators = clampInt(shift.numOperators ?? 1, 1, 20);
   const operatorHours = isNaN(effectiveHours) ? "0.00" : (effectiveHours * operators).toFixed(2);
 
-  // 🎨 Righe arancioni se non c'è operatore
-  const rowBg = !shift.operator ? "bg-orange-100" : "";
+  // se non c'è operatore → arancione visibile su OGNI cella + bordo inferiore
+  const unassigned = !shift.operator;
+  const cellStyle = unassigned ? { backgroundColor: "#FFE0B2" } as React.CSSProperties : undefined;
+  const cellClass = unassigned ? "border-b-2 border-orange-300" : "";
 
   return (
-    <tr className={`[&>td]:px-3 [&>td]:py-2 border-t ${rowBg}`}>
-      <td className="whitespace-nowrap">{safeItDate(shift.date)}</td>
-      <td className="whitespace-nowrap">{shift.startTime}</td>
-      <td className="whitespace-nowrap">{shift.endTime}</td>
-      <td className="whi
+    <tr className="[&>td]:px-3 [&>td]:py-2 border-t">
+      <td style={cellStyle} className={`whitespace-nowrap ${cellClass}`}>{safeItDate(shift.date)}</td>
+      <td style={cellStyle} className={`whitespace-nowrap ${cellClass}`}>{shift.startTime}</td>
+      <td style={cellStyle} className={`whitespace-nowrap ${cellClass}`}>{shift.endTime}</td>
+      <td style={cellStyle} className={`whitespace-nowrap ${cellClass}`}>{shift.activityType}</td>
+      <td style={cellStyle} className={`whitespace-nowrap ${cellClass}`}>{shift.operator ?? "—"}</td>
+
+      <td style={cellStyle} className={`whitespace-nowrap ${cellClass}`}>
+        <Input
+          type="number"
+          min={1}
+          max={20}
+          step={1}
+          className="h-9 w-24 text-right"
+          value={opsVal}
+          onChange={(e) => setOpsVal(e.target.value)}
+          onBlur={commitOps}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+          }}
+        />
+      </td>
+
+      <td style={cellStyle} className={`whitespace-nowrap ${cellClass}`}>
+        <Input
+          type="number"
+          min="0"
+          step="0.25"
+          className="h-9 w-24 text-right"
+          value={pauseVal}
+          onChange={(e) => setPauseVal(e.target.value)}
+          onBlur={commitPause}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+          }}
+        />
+      </td>
+
+      <td style={cellStyle} className={`whitespace-nowrap ${cellClass}`}>{effectiveHoursStr}</td>
+      <td style={cellStyle} className={`whitespace-nowrap ${cellClass}`}>{operatorHours}</td>
+      <td style={cellStyle} className={`text-right ${cellClass}`}>{/* pulsanti azioni esistenti */}</td>
+    </tr>
+  );
+}
+
+// Utils
+function calcEffectiveHours(start: string, end: string, pause: number): string {
+  try {
+    const [sh, sm] = start.split(":").map(Number);
+    const [eh, em] = end.split(":").map(Number);
+    const startMin = sh * 60 + sm;
+    const endMin = eh * 60 + em;
+    let diff = (endMin - startMin) / 60 - pause;
+    if (diff < 0) diff = 0;
+    return diff.toFixed(2);
+  } catch {
+    return "0.00";
+  }
+}
+
+function clampInt(n: number, min: number, max: number) {
+  if (Number.isNaN(n)) return min;
+  return Math.max(min, Math.min(max, Math.trunc(n)));
+}
+
+function safeItDate(iso: string) {
+  try {
+    const d = new Date(iso);
+    return d.toLocaleDateString("it-IT");
+  } catch {
+    return iso;
+  }
+}
