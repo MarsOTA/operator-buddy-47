@@ -1,4 +1,12 @@
 import { useState } from "react";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 
 type Shift = {
@@ -7,11 +15,11 @@ type Shift = {
   startTime: string;          // HH:mm
   endTime: string;            // HH:mm
   activityType: string;
-  operator?: string | null;   // es. "Verdi Anna" oppure null
-  operatorId?: string | null; // se presente è la chiave operatore
-  phone?: string | null;      // opzionale per colonna TEL
-  pauseHours?: number | null;
-  numOperators?: number | null;
+  operator?: string | null;   // es. "Bianchi Luca" oppure null (mostri bottone Assegna)
+  operatorId?: string | null; // ⬅️ USATO per capire se è assegnato
+  phone?: string | null;      // opzionale (TEL)
+  pauseHours?: number | null; // opzionale (PAUSA H.)
+  numOperators?: number | null; // opzionale (N° operatori)
 };
 
 type Props = {
@@ -24,50 +32,47 @@ export default function TaskList({ shifts, onUpdateShift }: Props) {
     return <div className="text-sm text-muted-foreground px-2 py-4">Nessun turno inserito.</div>;
   }
 
-  // Totali (se ti servono in fondo, lasciali; altrimenti puoi rimuovere la sezione <tfoot>)
-  const totalEffective = shifts.reduce((sum, s) => {
-    const eff = parseFloat(calcEffectiveHours(s.startTime, s.endTime, s.pauseHours ?? 0));
-    return sum + (isNaN(eff) ? 0 : eff);
-  }, 0);
-
-  const totalOperatorHours = shifts.reduce((sum, s) => {
-    const eff = parseFloat(calcEffectiveHours(s.startTime, s.endTime, s.pauseHours ?? 0));
+  const totalEff = shifts.reduce((sum, s) => sum + toNumber(calcEff(s)), 0);
+  const totalOpsH = shifts.reduce((sum, s) => {
+    const eff = toNumber(calcEff(s));
     const ops = clampInt(s.numOperators ?? 1, 1, 20);
-    return sum + (isNaN(eff) ? 0 : eff) * ops;
+    return sum + eff * ops;
   }, 0);
 
   return (
     <div className="overflow-x-auto rounded-md border">
-      <table className="w-full text-sm">
-        <thead className="bg-muted/50">
-          <tr className="[&>th]:px-3 [&>th]:py-2 text-left">
-            <th>Data</th>
-            <th>Ora inizio</th>
-            <th>Ora fine</th>
-            <th>Tipologia attività</th>
-            <th>Operatore</th>
-            <th>TEL</th>
-            <th>N° operatori</th>
-            <th>Pausa h.</th>
-            <th>Ore effettive</th>
-            <th>Ore operatori</th>
-            <th className="text-right pr-3">Azioni</th>
-          </tr>
-        </thead>
-        <tbody>
+      <Table className="w-full text-sm">
+        <TableHeader className="bg-muted/50">
+          <TableRow>
+            <TableHead>Data</TableHead>
+            <TableHead>Ora inizio</TableHead>
+            <TableHead>Ora fine</TableHead>
+            <TableHead>Tipologia attività</TableHead>
+            <TableHead>Operatore</TableHead>
+            <TableHead>TEL</TableHead>
+            <TableHead>N° operatori</TableHead>
+            <TableHead>Pausa h.</TableHead>
+            <TableHead>Ore totali</TableHead>
+            <TableHead>Ore operatori</TableHead>
+            <TableHead className="text-right">Azioni</TableHead>
+          </TableRow>
+        </TableHeader>
+
+        <TableBody>
           {shifts.map((s) => (
             <Row key={s.id} shift={s} onUpdate={(patch) => onUpdateShift(s.id, patch)} />
           ))}
-        </tbody>
-        <tfoot className="bg-muted/30 font-semibold">
-          <tr>
-            <td colSpan={8} className="px-3 py-2 text-right">Totali:</td>
-            <td className="px-3 py-2">{totalEffective.toFixed(2)}</td>
-            <td className="px-3 py-2">{totalOperatorHours.toFixed(2)}</td>
+        </TableBody>
+
+        <tfoot className="border-t bg-muted/50 font-medium">
+          <tr className="[&>td]:px-4 [&>td]:py-3">
+            <td colSpan={8} className="text-right">Totali:</td>
+            <td>{totalEff.toFixed(2)}</td>
+            <td>{totalOpsH.toFixed(2)}</td>
             <td />
           </tr>
         </tfoot>
-      </table>
+      </Table>
     </div>
   );
 }
@@ -92,55 +97,36 @@ function Row({ shift, onUpdate }: { shift: Shift; onUpdate: (patch: Partial<Shif
     if (n !== current) onUpdate({ numOperators: n });
   };
 
-  const effectiveHoursStr = calcEffectiveHours(shift.startTime, shift.endTime, shift.pauseHours ?? 0);
-  const effectiveHours = parseFloat(effectiveHoursStr);
-  const operators = clampInt(shift.numOperators ?? 1, 1, 20);
-  const operatorHours = isNaN(effectiveHours) ? "0.00" : (effectiveHours * operators).toFixed(2);
+  const effStr = calcEff(shift);
+  const eff = toNumber(effStr);
+  const ops = clampInt(shift.numOperators ?? 1, 1, 20);
+  const opsHours = (eff * ops).toFixed(2);
 
-  // ✅ Rilevazione "non assegnato" + logica più robusta
-  const noName =
-    !shift.operator ||
-    (typeof shift.operator === "string" && shift.operator.trim() === "") ||
-    (typeof shift.operator === "string" && shift.operator.toLowerCase().includes("assegna"));
-  
-  const noPhone = !shift.phone || shift.phone === "-" || shift.phone.trim() === "";
-  
-  const unassigned = (!shift.operatorId && noName) || noPhone;
-
-  // Debug: aggiungi questo per vedere cosa sta succedendo
-  console.log('Shift:', shift.id, {
-    operator: shift.operator,
-    operatorId: shift.operatorId,
-    phone: shift.phone,
-    noName,
-    noPhone,
-    unassigned
-  });
+  // ✅ se NON c'è operatorId consideriamo "non assegnato"
+  const unassigned = !shift.operatorId;
+  const cellStyle = unassigned ? { backgroundColor: "#FFE0B2" } as React.CSSProperties : undefined;
 
   return (
-    <tr
-      className={`[&>td]:px-3 [&>td]:py-2 border-t ${
-        unassigned ? '!bg-orange-100 hover:!bg-orange-200' : 'hover:bg-muted/50'
-      }`}
-      style={unassigned ? { 
-        backgroundColor: '#FED7AA !important',
-        '--tw-bg-opacity': '1'
-      } : undefined}
-    >
-      <td className="whitespace-nowrap">{safeItDate(shift.date)}</td>
-      <td className="whitespace-nowrap">{shift.startTime}</td>
-      <td className="whitespace-nowrap">{shift.endTime}</td>
-      <td className="whitespace-nowrap">{shift.activityType}</td>
-      <td className={`whitespace-nowrap ${unassigned ? 'font-semibold text-orange-800' : ''}`}>
-        {shift.operator ?? "—"}
-        {unassigned && <span className="ml-1 text-xs text-orange-600">(non assegnato)</span>}
-      </td>
-      <td className={`whitespace-nowrap ${unassigned ? 'font-semibold text-orange-800' : ''}`}>
-        {shift.phone ?? "-"}
-      </td>
+    <TableRow className="border-b transition-colors">
+      <TableCell style={cellStyle} className="whitespace-nowrap">{itDate(shift.date)}</TableCell>
+      <TableCell style={cellStyle} className="whitespace-nowrap">{shift.startTime}</TableCell>
+      <TableCell style={cellStyle} className="whitespace-nowrap">{shift.endTime}</TableCell>
+      <TableCell style={cellStyle} className="whitespace-nowrap">{shift.activityType}</TableCell>
 
-      {/* N° operatori */}
-      <td className="whitespace-nowrap">
+      <TableCell style={cellStyle} className="whitespace-nowrap">
+        {shift.operator ?? (
+          <button
+            type="button"
+            className="inline-flex items-center justify-center gap-2 text-sm font-medium h-9 px-3 rounded-md border border-input bg-background hover:bg-accent hover:text-accent-foreground"
+          >
+            Assegna
+          </button>
+        )}
+      </TableCell>
+
+      <TableCell style={cellStyle} className="whitespace-nowrap">{shift.phone ?? "-"}</TableCell>
+
+      <TableCell style={cellStyle} className="whitespace-nowrap">
         <Input
           type="number"
           min={1}
@@ -152,10 +138,9 @@ function Row({ shift, onUpdate }: { shift: Shift; onUpdate: (patch: Partial<Shif
           onBlur={commitOps}
           onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
         />
-      </td>
+      </TableCell>
 
-      {/* Pausa h. */}
-      <td className="whitespace-nowrap">
+      <TableCell style={cellStyle} className="whitespace-nowrap">
         <Input
           type="number"
           min="0"
@@ -166,40 +151,29 @@ function Row({ shift, onUpdate }: { shift: Shift; onUpdate: (patch: Partial<Shif
           onBlur={commitPause}
           onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
         />
-      </td>
+      </TableCell>
 
-      <td className="whitespace-nowrap">{effectiveHoursStr}</td>
-      <td className="whitespace-nowrap">{operatorHours}</td>
-      <td className="text-right">{/* pulsanti azioni esistenti */}</td>
-    </tr>
+      <TableCell style={cellStyle} className="whitespace-nowrap">{effStr}</TableCell>
+      <TableCell style={cellStyle} className="whitespace-nowrap">{opsHours}</TableCell>
+      <TableCell style={cellStyle} className="text-right">{/* azioni */}</TableCell>
+    </TableRow>
   );
 }
 
-// Utils
-function calcEffectiveHours(start: string, end: string, pause: number): string {
+/* Utils */
+function calcEff(s: Shift): string {
   try {
-    const [sh, sm] = start.split(":").map(Number);
-    const [eh, em] = end.split(":").map(Number);
+    const [sh, sm] = s.startTime.split(":").map(Number);
+    const [eh, em] = s.endTime.split(":").map(Number);
     const startMin = sh * 60 + sm;
     const endMin = eh * 60 + em;
-    let diff = (endMin - startMin) / 60 - pause;
+    let diff = (endMin - startMin) / 60 - (s.pauseHours ?? 0);
     if (diff < 0) diff = 0;
     return diff.toFixed(2);
   } catch {
     return "0.00";
   }
 }
-
-function clampInt(n: number, min: number, max: number) {
-  if (Number.isNaN(n)) return min;
-  return Math.max(min, Math.min(max, Math.trunc(n)));
-}
-
-function safeItDate(iso: string) {
-  try {
-    const d = new Date(iso);
-    return d.toLocaleDateString("it-IT");
-  } catch {
-    return iso;
-  }
-}
+function toNumber(x: string) { const n = parseFloat(x); return Number.isNaN(n) ? 0 : n; }
+function clampInt(n: number, min: number, max: number) { if (Number.isNaN(n)) return min; return Math.max(min, Math.min(max, Math.trunc(n))); }
+function itDate(iso: string) { try { return new Date(iso).toLocaleDateString("it-IT"); } catch { return iso; } }
