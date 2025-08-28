@@ -7,9 +7,9 @@ type Shift = {
   startTime: string;     // HH:mm
   endTime: string;       // HH:mm
   activityType: string;
-  operator?: string | null;   // nome/cognome assegnato (se manca → riga arancione)
-  pauseHours?: number | null; // ore di pausa
-  numOperators?: number | null; // n° operatori
+  operator?: string | null;   // se manca → riga arancione
+  pauseHours?: number | null;
+  numOperators?: number | null;
 };
 
 type Props = {
@@ -22,7 +22,6 @@ export default function TaskList({ shifts, onUpdateShift }: Props) {
     return <div className="text-sm text-muted-foreground px-2 py-4">Nessun turno inserito.</div>;
   }
 
-  // Totali
   const totalEffective = shifts.reduce((sum, s) => {
     const eff = parseFloat(calcEffectiveHours(s.startTime, s.endTime, s.pauseHours ?? 0));
     return sum + (isNaN(eff) ? 0 : eff);
@@ -99,85 +98,12 @@ function Row({ shift, onUpdate }: { shift: Shift; onUpdate: (patch: Partial<Shif
   const operators = clampInt(shift.numOperators ?? 1, 1, 20);
   const operatorHours = isNaN(effectiveHours) ? "0.00" : (effectiveHours * operators).toFixed(2);
 
-  // 🎨 Evidenziazione: arancione tenue se non c'è operatore assegnato
-  const rowBg = !shift.operator ? "bg-orange-50" : "";
+  // 🎨 Righe arancioni se non c'è operatore
+  const rowBg = !shift.operator ? "bg-orange-100" : "";
 
   return (
     <tr className={`[&>td]:px-3 [&>td]:py-2 border-t ${rowBg}`}>
       <td className="whitespace-nowrap">{safeItDate(shift.date)}</td>
       <td className="whitespace-nowrap">{shift.startTime}</td>
       <td className="whitespace-nowrap">{shift.endTime}</td>
-      <td className="whitespace-nowrap">{shift.activityType}</td>
-      <td className="whitespace-nowrap">{shift.operator ?? "—"}</td>
-
-      {/* N° operatori */}
-      <td className="whitespace-nowrap">
-        <Input
-          type="number"
-          min={1}
-          max={20}
-          step={1}
-          className="h-9 w-24 text-right"
-          value={opsVal}
-          onChange={(e) => setOpsVal(e.target.value)}
-          onBlur={commitOps}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-          }}
-        />
-      </td>
-
-      {/* Pausa h. */}
-      <td className="whitespace-nowrap">
-        <Input
-          type="number"
-          min="0"
-          step="0.25"
-          className="h-9 w-24 text-right"
-          value={pauseVal}
-          onChange={(e) => setPauseVal(e.target.value)}
-          onBlur={commitPause}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-          }}
-        />
-      </td>
-
-      <td className="whitespace-nowrap">{effectiveHoursStr}</td>
-      <td className="whitespace-nowrap">{operatorHours}</td>
-      <td className="text-right">{/* pulsanti azioni esistenti */}</td>
-    </tr>
-  );
-}
-
-// Utility
-function calcEffectiveHours(start: string, end: string, pause: number): string {
-  try {
-    const [sh, sm] = start.split(":").map(Number);
-    const [eh, em] = end.split(":").map(Number);
-
-    const startMin = sh * 60 + sm;
-    const endMin = eh * 60 + em;
-
-    let diff = (endMin - startMin) / 60 - pause;
-    if (diff < 0) diff = 0;
-
-    return diff.toFixed(2);
-  } catch {
-    return "0.00";
-  }
-}
-
-function clampInt(n: number, min: number, max: number) {
-  if (Number.isNaN(n)) return min;
-  return Math.max(min, Math.min(max, Math.trunc(n)));
-}
-
-function safeItDate(iso: string) {
-  try {
-    const d = new Date(iso);
-    return d.toLocaleDateString("it-IT");
-  } catch {
-    return iso;
-  }
-}
+      <td className="whi
