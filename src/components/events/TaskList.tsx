@@ -7,9 +7,9 @@ type Shift = {
   startTime: string;     // HH:mm
   endTime: string;       // HH:mm
   activityType: string;
-  operator?: string | null;
-  pauseHours?: number | null;
-  numOperators?: number | null;
+  operator?: string | null;   // nome/cognome assegnato (se manca, riga arancione)
+  pauseHours?: number | null; // ore di pausa nel turno
+  numOperators?: number | null; // numero operatori sul turno
 };
 
 type Props = {
@@ -22,7 +22,7 @@ export default function TaskList({ shifts, onUpdateShift }: Props) {
     return <div className="text-sm text-muted-foreground px-2 py-4">Nessun turno inserito.</div>;
   }
 
-  // Totali
+  // Totali (somma delle ore effettive e delle ore operatori)
   const totalEffective = shifts.reduce((sum, s) => {
     const eff = parseFloat(calcEffectiveHours(s.startTime, s.endTime, s.pauseHours ?? 0));
     return sum + (isNaN(eff) ? 0 : eff);
@@ -45,7 +45,7 @@ export default function TaskList({ shifts, onUpdateShift }: Props) {
             <th>Ora fine</th>
             <th>Tipologia attività</th>
             <th>Operatore</th>
-            <th>N° operatori</th> {/* nuovo: editabile */}
+            <th>N° operatori</th>
             <th>Pausa h.</th>
             <th>Ore effettive</th>
             <th>Ore operatori</th>
@@ -71,7 +71,7 @@ export default function TaskList({ shifts, onUpdateShift }: Props) {
 }
 
 function Row({ shift, onUpdate }: { shift: Shift; onUpdate: (patch: Partial<Shift>) => void }) {
-  // stati locali per gli input editabili
+  // Stati locali per edit inline
   const [pauseVal, setPauseVal] = useState<string>((shift.pauseHours ?? 0).toString());
   const [opsVal, setOpsVal] = useState<string>(String(clampInt(shift.numOperators ?? 1, 1, 20)));
 
@@ -89,8 +89,7 @@ function Row({ shift, onUpdate }: { shift: Shift; onUpdate: (patch: Partial<Shif
   const commitOps = () => {
     const n = clampInt(parseInt(opsVal || "1", 10), 1, 20);
     const current = clampInt(shift.numOperators ?? 1, 1, 20);
-    // normalizza il campo input mostrando il clamp
-    setOpsVal(String(n));
+    setOpsVal(String(n)); // normalizza visualizzazione
     if (n !== current) {
       onUpdate({ numOperators: n });
     }
@@ -101,13 +100,16 @@ function Row({ shift, onUpdate }: { shift: Shift; onUpdate: (patch: Partial<Shif
   const operators = clampInt(shift.numOperators ?? 1, 1, 20);
   const operatorHours = isNaN(effectiveHours) ? "0.00" : (effectiveHours * operators).toFixed(2);
 
+  // 🎨 Evidenziazione: arancione tenue se non c'è operatore assegnato
+  const rowBg = !shift.operator ? "bg-[#FFF4E5]" : "";
+
   return (
-    <tr className="[&>td]:px-3 [&>td]:py-2 border-t">
-      <td>{new Date(shift.date).toLocaleDateString("it-IT")}</td>
-      <td>{shift.startTime}</td>
-      <td>{shift.endTime}</td>
-      <td>{shift.activityType}</td>
-      <td>{shift.operator ?? "—"}</td>
+    <tr className={`[&>td]:px-3 [&>td]:py-2 border-t ${rowBg}`}>
+      <td className="whitespace-nowrap">{safeItDate(shift.date)}</td>
+      <td className="whitespace-nowrap">{shift.startTime}</td>
+      <td className="whitespace-nowrap">{shift.endTime}</td>
+      <td className="whitespace-nowrap">{shift.activityType}</td>
+      <td className="whitespace-nowrap">{shift.operator ?? "—"}</td>
 
       {/* N° operatori (editabile) */}
       <td className="whitespace-nowrap">
@@ -142,8 +144,8 @@ function Row({ shift, onUpdate }: { shift: Shift; onUpdate: (patch: Partial<Shif
         />
       </td>
 
-      <td>{effectiveHoursStr}</td>
-      <td>{operatorHours}</td>
+      <td className="whitespace-nowrap">{effectiveHoursStr}</td>
+      <td className="whitespace-nowrap">{operatorHours}</td>
       <td className="text-right">{/* pulsanti azioni esistenti */}</td>
     </tr>
   );
@@ -170,4 +172,13 @@ function calcEffectiveHours(start: string, end: string, pause: number): string {
 function clampInt(n: number, min: number, max: number) {
   if (Number.isNaN(n)) return min;
   return Math.max(min, Math.min(max, Math.trunc(n)));
+}
+
+function safeItDate(iso: string) {
+  try {
+    const d = new Date(iso);
+    return d.toLocaleDateString("it-IT");
+  } catch {
+    return iso;
+  }
 }
