@@ -1,5 +1,4 @@
 import * as React from "react"
-
 import { cn } from "@/lib/utils"
 
 const Table = React.forwardRef<
@@ -51,14 +50,27 @@ const TableFooter = React.forwardRef<
 ))
 TableFooter.displayName = "TableFooter"
 
+/**
+ * TableRow ora supporta l'attributo:
+ *   data-unassigned="true"
+ * Se presente, colora la riga in arancione tenue (e tutte le celle) ignorando zebra/hover globali.
+ */
 const TableRow = React.forwardRef<
   HTMLTableRowElement,
-  React.HTMLAttributes<HTMLTableRowElement>
+  React.HTMLAttributes<HTMLTableRowElement> & { "data-unassigned"?: string }
 >(({ className, ...props }, ref) => (
   <tr
     ref={ref}
     className={cn(
+      // stile base shadcn
       "border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted",
+      // 🔶 override quando la riga è "unassigned"
+      // - applica bg alla <tr>
+      "data-[unassigned=true]:bg-orange-100",
+      "data-[unassigned=true]:hover:bg-orange-100",
+      // - applica bg anche a TUTTE le <td> figlie (batte even:bg-muted, bg-white, ecc.)
+      "[&[data-unassigned=true]>td]:bg-orange-100",
+      "[&[data-unassigned=true]:hover>td]:bg-orange-100",
       className
     )}
     {...props}
