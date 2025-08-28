@@ -7,9 +7,9 @@ type Shift = {
   startTime: string;     // HH:mm
   endTime: string;       // HH:mm
   activityType: string;
-  operator?: string | null;   // nome/cognome assegnato (se manca, riga arancione)
-  pauseHours?: number | null; // ore di pausa nel turno
-  numOperators?: number | null; // numero operatori sul turno
+  operator?: string | null;   // nome/cognome assegnato (se manca → riga arancione)
+  pauseHours?: number | null; // ore di pausa
+  numOperators?: number | null; // n° operatori
 };
 
 type Props = {
@@ -22,7 +22,7 @@ export default function TaskList({ shifts, onUpdateShift }: Props) {
     return <div className="text-sm text-muted-foreground px-2 py-4">Nessun turno inserito.</div>;
   }
 
-  // Totali (somma delle ore effettive e delle ore operatori)
+  // Totali
   const totalEffective = shifts.reduce((sum, s) => {
     const eff = parseFloat(calcEffectiveHours(s.startTime, s.endTime, s.pauseHours ?? 0));
     return sum + (isNaN(eff) ? 0 : eff);
@@ -71,7 +71,6 @@ export default function TaskList({ shifts, onUpdateShift }: Props) {
 }
 
 function Row({ shift, onUpdate }: { shift: Shift; onUpdate: (patch: Partial<Shift>) => void }) {
-  // Stati locali per edit inline
   const [pauseVal, setPauseVal] = useState<string>((shift.pauseHours ?? 0).toString());
   const [opsVal, setOpsVal] = useState<string>(String(clampInt(shift.numOperators ?? 1, 1, 20)));
 
@@ -89,7 +88,7 @@ function Row({ shift, onUpdate }: { shift: Shift; onUpdate: (patch: Partial<Shif
   const commitOps = () => {
     const n = clampInt(parseInt(opsVal || "1", 10), 1, 20);
     const current = clampInt(shift.numOperators ?? 1, 1, 20);
-    setOpsVal(String(n)); // normalizza visualizzazione
+    setOpsVal(String(n));
     if (n !== current) {
       onUpdate({ numOperators: n });
     }
@@ -101,7 +100,7 @@ function Row({ shift, onUpdate }: { shift: Shift; onUpdate: (patch: Partial<Shif
   const operatorHours = isNaN(effectiveHours) ? "0.00" : (effectiveHours * operators).toFixed(2);
 
   // 🎨 Evidenziazione: arancione tenue se non c'è operatore assegnato
-  const rowBg = !shift.operator ? "bg-[#FFF4E5]" : "";
+  const rowBg = !shift.operator ? "bg-orange-50" : "";
 
   return (
     <tr className={`[&>td]:px-3 [&>td]:py-2 border-t ${rowBg}`}>
@@ -111,7 +110,7 @@ function Row({ shift, onUpdate }: { shift: Shift; onUpdate: (patch: Partial<Shif
       <td className="whitespace-nowrap">{shift.activityType}</td>
       <td className="whitespace-nowrap">{shift.operator ?? "—"}</td>
 
-      {/* N° operatori (editabile) */}
+      {/* N° operatori */}
       <td className="whitespace-nowrap">
         <Input
           type="number"
@@ -128,7 +127,7 @@ function Row({ shift, onUpdate }: { shift: Shift; onUpdate: (patch: Partial<Shif
         />
       </td>
 
-      {/* Pausa h. (editabile) */}
+      {/* Pausa h. */}
       <td className="whitespace-nowrap">
         <Input
           type="number"
@@ -140,7 +139,7 @@ function Row({ shift, onUpdate }: { shift: Shift; onUpdate: (patch: Partial<Shif
           onBlur={commitPause}
           onKeyDown={(e) => {
             if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-          })}
+          }}
         />
       </td>
 
@@ -151,7 +150,7 @@ function Row({ shift, onUpdate }: { shift: Shift; onUpdate: (patch: Partial<Shif
   );
 }
 
-// Utility: calcola ore effettive come stringa decimale
+// Utility
 function calcEffectiveHours(start: string, end: string, pause: number): string {
   try {
     const [sh, sm] = start.split(":").map(Number);
