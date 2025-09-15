@@ -1,0 +1,7 @@
+project_id = "lvisxixfxhtjpmzaplop"
+
+[functions.send-push-notification]
+verify_jwt = false
+
+[functions.send-shift-notification]
+verify_jwt = false
