@@ -71,3 +71,12 @@ Yes, you can!
 To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
 
 Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+
+## Testare la PWA
+
+Per verificare il funzionamento della PWA in locale:
+
+1. Installa le dipendenze con `npm install`.
+2. Esegui la build di produzione: `npm run build`.
+3. Avvia l'anteprima locale: `npm run preview` e apri l'URL mostrato.
+4. Da browser, usa "Aggiungi alla schermata Home" e verifica che compaia il toast "App aggiornata — ricarica" quando è disponibile un aggiornamento.
