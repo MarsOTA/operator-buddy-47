@@ -16,6 +16,7 @@ import OperatorDashboard from "./pages/OperatorDashboard";
 import OperatorShiftDetail from "./pages/OperatorShiftDetail";
 import Auth from "./pages/Auth";
 import OperatorProfile from "./pages/OperatorProfile";
+import OperatorSetup from "./pages/OperatorSetup";
 import Header from "./components/layout/Header";
 import ProtectedRoute from "./components/ProtectedRoute";
 
@@ -70,6 +71,11 @@ const App = () => (
               <ProtectedRoute>
                 <Header />
                 <OperatorDashboard />
+              </ProtectedRoute>
+            } />
+            <Route path="/operator/setup" element={
+              <ProtectedRoute>
+                <OperatorSetup />
               </ProtectedRoute>
             } />
             <Route path="/operator/profile" element={
