@@ -85,6 +85,9 @@ export const useAuth = () => {
         description: error.message,
         variant: "destructive"
       });
+    } else {
+      // Redirect to auth page after successful logout
+      window.location.href = '/auth';
     }
   };
 

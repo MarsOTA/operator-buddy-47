@@ -1,12 +1,10 @@
-import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Calendar, MapPin, Clock, Users, ChevronRight, LogIn, LogOut } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
-import { useRole } from '@/hooks/useRole';
 import { useNavigate } from 'react-router-dom';
 import { useCheckInOut } from '@/hooks/useCheckInOut';
+import { useOperatorShifts } from '@/hooks/useOperatorShifts';
 import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
 
@@ -77,84 +75,8 @@ const CheckInButton = ({ shiftId }: { shiftId: string }) => {
 };
 
 export const OperatorEventsList = () => {
-  const { profile } = useRole();
   const navigate = useNavigate();
-  const [shifts, setShifts] = useState<AssignedShift[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (!profile?.operator_id) return;
-
-    const fetchAssignedShifts = async () => {
-      try {
-        setLoading(true);
-        
-        // Fetch shifts where the operator is assigned
-        const { data, error } = await supabase
-          .from('shift_assignments')
-          .select(`
-            shift_id,
-            shifts!inner (
-              id,
-              date,
-              start_time,
-              end_time,
-              activity_type,
-              required_operators,
-              events!inner (
-                id,
-                title,
-                address,
-                clients!inner (
-                  name
-                ),
-                brands!inner (
-                  name
-                )
-              )
-            )
-          `)
-          .eq('operator_id', profile.operator_id);
-
-        if (error) {
-          console.error('Error fetching assigned shifts:', error);
-          return;
-        }
-
-        // Transform the data to match our interface
-        const transformedShifts = data?.map((assignment: any) => ({
-          id: assignment.shifts.id,
-          date: assignment.shifts.date,
-          start_time: assignment.shifts.start_time,
-          end_time: assignment.shifts.end_time,
-          activity_type: assignment.shifts.activity_type,
-          required_operators: assignment.shifts.required_operators,
-          event: {
-            id: assignment.shifts.events.id,
-            title: assignment.shifts.events.title,
-            address: assignment.shifts.events.address,
-            client: {
-              name: assignment.shifts.events.clients.name
-            },
-            brand: {
-              name: assignment.shifts.events.brands.name
-            }
-          }
-        })) || [];
-
-        // Sort by date (upcoming first)
-        transformedShifts.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-        
-        setShifts(transformedShifts);
-      } catch (err) {
-        console.error('Error in fetchAssignedShifts:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchAssignedShifts();
-  }, [profile?.operator_id]);
+  const { shifts, loading, error } = useOperatorShifts();
 
   const formatDate = (dateString: string) => {
     return format(new Date(dateString), 'dd MMM yyyy', { locale: it });
@@ -180,6 +102,18 @@ export const OperatorEventsList = () => {
           </Card>
         ))}
       </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card>
+        <CardContent className="p-6 text-center">
+          <Calendar className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+          <h3 className="text-lg font-medium mb-2">Errore nel caricamento</h3>
+          <p className="text-muted-foreground">{error}</p>
+        </CardContent>
+      </Card>
     );
   }
 

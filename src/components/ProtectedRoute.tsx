@@ -31,5 +31,10 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
     return <Navigate to="/operator/dashboard" replace />;
   }
 
+  // Check if operator user needs to set up their operator link
+  if (user && isOperator && location.pathname.startsWith('/operator/dashboard')) {
+    // Additional check will be handled by the OperatorDashboard component itself
+  }
+
   return <>{children}</>;
 }

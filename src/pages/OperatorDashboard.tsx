@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useRole } from '@/hooks/useRole';
 import { useAppBadge } from '@/hooks/useAppBadge';
+import { useOperatorStats } from '@/hooks/useOperatorStats';
 import { OperatorEventsList } from '@/components/operator/OperatorEventsList';
 import { Card, CardContent } from '@/components/ui/card';
 import { User, Calendar, Settings } from 'lucide-react';
@@ -11,6 +12,7 @@ import { Button } from '@/components/ui/button';
 export default function OperatorDashboard() {
   const { user, loading: authLoading } = useAuth();
   const { profile, loading: roleLoading, isOperator } = useRole();
+  const { stats, loading: statsLoading } = useOperatorStats();
   const navigate = useNavigate();
   
   // Initialize app badge for PWA notifications
@@ -26,6 +28,12 @@ export default function OperatorDashboard() {
       // If user is admin, redirect to admin dashboard
       if (profile?.role === 'admin') {
         navigate('/');
+        return;
+      }
+
+      // If operator doesn't have operator_id set, redirect to setup
+      if (profile?.role === 'operator' && !profile?.operator_id) {
+        navigate('/operator/setup');
         return;
       }
     }
@@ -95,7 +103,9 @@ export default function OperatorDashboard() {
               <Calendar className="h-8 w-8 text-primary" />
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Turni Oggi</p>
-                <p className="text-2xl font-bold">0</p>
+                <p className="text-2xl font-bold">
+                  {statsLoading ? '...' : stats.todayShifts}
+                </p>
               </div>
             </div>
           </CardContent>
@@ -107,7 +117,9 @@ export default function OperatorDashboard() {
               <Calendar className="h-8 w-8 text-secondary" />
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Prossimi Turni</p>
-                <p className="text-2xl font-bold">0</p>
+                <p className="text-2xl font-bold">
+                  {statsLoading ? '...' : stats.upcomingShifts}
+                </p>
               </div>
             </div>
           </CardContent>
@@ -118,8 +130,10 @@ export default function OperatorDashboard() {
             <div className="flex items-center gap-4">
               <User className="h-8 w-8 text-accent" />
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Stato</p>
-                <p className="text-lg font-semibold text-green-600">Disponibile</p>
+                <p className="text-sm font-medium text-muted-foreground">Totale Turni</p>
+                <p className="text-2xl font-bold">
+                  {statsLoading ? '...' : stats.totalShifts}
+                </p>
               </div>
             </div>
           </CardContent>
