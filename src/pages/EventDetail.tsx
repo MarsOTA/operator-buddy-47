@@ -5,12 +5,13 @@ import { useAppStore, ACTIVITY_TYPES, type ActivityType } from "@/store/appStore
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { CalendarIcon, Users, Crown, UserPlus, Plus, Trash2, Edit2, Save, X, FileText, ArrowUpDown, ArrowUp, ArrowDown, ListChecks, Clock, Building2, MapPin, Calendar, Badge, Copy, Phone, StickyNote, Lock, Unlock } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { CalendarIcon, Users, Crown, UserPlus, Plus, Trash2, Edit2, Save, X, FileText, ArrowUpDown, ArrowUp, ArrowDown, ListChecks, Clock, Building2, MapPin, Calendar, Badge, Phone, StickyNote, Lock, Unlock, Pencil } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import OperatorDetailsDialog from "@/components/events/OperatorDetailsDialog";
 import OperatorAssignDialog from "@/components/events/OperatorAssignDialog";
 import ShiftPlanningForm from "@/components/events/ShiftPlanningForm";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -20,6 +21,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { cn, formatDateToDDMMYY, parseDateFromDDMMYY } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { NotificationService } from "@/services/notificationService";
+import { ClientBrandBadge } from "@/components/ui/client-brand-badge";
 
 const EventDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -91,6 +93,8 @@ const EventDetail = () => {
   // Inline editing states
   const [editingField, setEditingField] = useState<string | null>(null);
   const [tempValues, setTempValues] = useState<Record<string, any>>({});
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [tempTitle, setTempTitle] = useState("");
 
   const handleStartEdit = (field: string, currentValue: any) => {
     setEditingField(field);
@@ -122,11 +126,32 @@ const EventDetail = () => {
     setTempValues({});
   };
 
+  const handleStartTitleEdit = () => {
+    setEditingTitle(true);
+    setTempTitle(event.title);
+  };
+
+  const handleSaveTitle = () => {
+    if (tempTitle.trim()) {
+      updateEvent(event.id, { title: tempTitle.trim() });
+    }
+    setEditingTitle(false);
+    setTempTitle("");
+  };
+
+  const handleCancelTitleEdit = () => {
+    setEditingTitle(false);
+    setTempTitle("");
+  };
+
   if (!event) return (
     <main className="container py-8">
       <p className="text-muted-foreground">Evento non trovato.</p>
     </main>
   );
+
+  const client = clients.find(c => c.id === event.clientId);
+  const brand = brands.find(b => b.id === event.brandId);
 
   const handleShiftSubmit = (values: any) => {
     const d = `${values.date.getFullYear()}-${String(values.date.getMonth() + 1).padStart(2, "0")}-${String(values.date.getDate()).padStart(2, "0")}`;
@@ -235,24 +260,6 @@ const EventDetail = () => {
     }
   };
 
-  const handleDuplicateShift = (shift: any) => {
-    // Get actual times from slot overrides or default shift times
-    const slotKey = `${shift.id}-${shift.slotIndex}`;
-    const actualStartTime = slotTimes[slotKey]?.startTime || shift.startTime;
-    const actualEndTime = slotTimes[slotKey]?.endTime || shift.endTime;
-    
-    createShift({
-      eventId: event.id,
-      date: shift.date,
-      startTime: actualStartTime,
-      endTime: actualEndTime,
-      operatorIds: [""], // No operator assigned to duplicate
-      activityType: shift.activityType,
-      requiredOperators: 1,
-      notes: undefined // Don't copy notes
-    });
-  };
-
   const handleSendEmail = (shift: any) => {
     setSelectedShiftForEmail(shift);
     setEmailModalOpen(true);
@@ -329,7 +336,7 @@ const EventDetail = () => {
     return arr;
   }, [flattenedShifts, sort, operators]);
 
-  // Calculate total operator hours
+  // Calculate total operator hours (assigned) and total billable hours (all shifts)
   const totalOperatorHours = useMemo(() => {
     return sortedShifts.reduce((total, row) => {
       if (row.isAssigned) {
@@ -345,6 +352,18 @@ const EventDetail = () => {
     }, 0);
   }, [sortedShifts, slotTimes, pauseHours]);
 
+  const totalBillableHours = useMemo(() => {
+    return sortedShifts.reduce((total, row) => {
+      const slotKey = `${row.id}-${row.slotIndex}`;
+      const hours = parseFloat(calculateHours(
+        slotTimes[slotKey]?.startTime || row.startTime,
+        slotTimes[slotKey]?.endTime || row.endTime,
+        pauseHours[slotKey] || shifts.find(s => s.id === row.id)?.pauseHours || 0
+      ));
+      return total + hours;
+    }, 0);
+  }, [sortedShifts, slotTimes, pauseHours]);
+
   return (
     <main className="container py-8">
       <Helmet>
@@ -353,224 +372,284 @@ const EventDetail = () => {
         <link rel="canonical" href={`/events/${event.id}`} />
       </Helmet>
 
-      {/* Event info header and shift planning */}
+      {/* Event header with title and badges */}
+      <header className="mb-8">
+        <div className="flex items-start justify-between">
+          {/* Event title - editable on hover */}
+          <div className="group flex items-center gap-2">
+            {editingTitle ? (
+              <div className="flex items-center gap-2">
+                <Input
+                  value={tempTitle}
+                  onChange={(e) => setTempTitle(e.target.value)}
+                  className="text-3xl font-extrabold font-mulish h-12 border-2 border-primary"
+                  style={{ color: "#72AD97" }}
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleSaveTitle();
+                    if (e.key === 'Escape') handleCancelTitleEdit();
+                  }}
+                />
+                <Button variant="ghost" size="sm" onClick={handleSaveTitle}>
+                  <Save className="h-4 w-4" />
+                </Button>
+                <Button variant="ghost" size="sm" onClick={handleCancelTitleEdit}>
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            ) : (
+              <>
+                <h1 className="text-3xl font-extrabold font-mulish" style={{ color: "#72AD97" }}>
+                  {event.title}
+                </h1>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="opacity-0 group-hover:opacity-100 transition-opacity"
+                  onClick={handleStartTitleEdit}
+                >
+                  <Pencil className="h-4 w-4" />
+                </Button>
+              </>
+            )}
+          </div>
+          
+          {/* Client and Brand badges */}
+          <div className="flex flex-col gap-2">
+            {client && <ClientBrandBadge label="CLIENT" text={client.name} variant="client" />}
+            {brand && <ClientBrandBadge label="BRAND" text={brand.name} variant="brand" />}
+          </div>
+        </div>
+      </header>
+
+      {/* Main content layout */}
       <section className="mb-8">
         <div className="flex gap-8">
-          {/* Left side - Event details (40%) */}
-          <div className="flex-[0_0_40%]">
-            <h1 className="mb-6 text-3xl font-extrabold font-mulish" style={{ color: "#72AD97" }}>{event.title}</h1>
-            
-            {/* Event details under title */}
-            <div className="space-y-4">
-              {/* Address field */}
-              <div className="flex items-center gap-3">
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <MapPin className="h-5 w-5" style={{ color: '#72AD97', backgroundColor: 'transparent' }} />
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>Indirizzo evento</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-                <div className="flex-1 flex items-center gap-2">
-                  {editingField === 'address' ? (
-                    <>
-                      <Input
-                        value={tempValues.address || ''}
-                        onChange={(e) => setTempValues({ ...tempValues, address: e.target.value })}
-                        className="flex-1 h-10 border-0 border-b border-border/30 rounded-none focus:border-primary bg-transparent"
-                        placeholder="Viale Montenapeoleone 10, Milano"
-                        autoFocus
-                      />
-                      <Button variant="ghost" size="sm" onClick={() => handleSaveField('address')}>
-                        <Save className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="sm" onClick={handleCancelEdit}>
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </>
-                  ) : (
-                    <>
-                      <span className="flex-1 py-2">{event.address || 'Indirizzo non specificato'}</span>
-                      <Button variant="ghost" size="sm" onClick={() => handleStartEdit('address', event.address)}>
-                        <Edit2 className="h-4 w-4" />
-                      </Button>
-                    </>
-                  )}
-                </div>
-              </div>
-              
-              {/* Date fields */}
-              <div className="flex items-center gap-3">
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Calendar className="h-5 w-5" style={{ color: '#72AD97', backgroundColor: 'transparent' }} />
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>Data inizio e fine evento</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-                <div className="flex-1">
-                  <div className="flex gap-2 items-center">
-                    {/* Start Date */}
-                       <div className="flex items-center gap-2">
-                       {editingField === 'startDate' ? (
-                         <>
-                           <Input
-                             type="text"
-                             placeholder="GG/MM/AA"
-                             value={tempValues.startDate || ''}
-                             onChange={(e) => setTempValues({ ...tempValues, startDate: e.target.value })}
-                             className="h-10 border-0 border-b border-border/30 rounded-none focus:border-primary bg-transparent"
-                             autoFocus
-                           />
-                           <Button variant="ghost" size="sm" onClick={() => handleSaveField('startDate')}>
-                             <Save className="h-4 w-4" />
-                           </Button>
-                           <Button variant="ghost" size="sm" onClick={handleCancelEdit}>
-                             <X className="h-4 w-4" />
-                           </Button>
-                         </>
-                       ) : (
-                         <>
-                           <span className="py-2">{formatDateToDDMMYY(event.startDate) || 'Data non specificata'}</span>
-                           <Button variant="ghost" size="sm" onClick={() => handleStartEdit('startDate', formatDateToDDMMYY(event.startDate))}>
-                             <Edit2 className="h-4 w-4" />
-                           </Button>
-                         </>
-                       )}
+          {/* Left side - Event details (60%) */}
+          <div className="flex-[0_0_60%]">
+            <Card className="bg-muted/30 border-none">
+              <CardContent className="p-6">
+                {/* Event details */}
+                <div className="space-y-4">
+                  {/* Address field */}
+                  <div className="flex items-center gap-3">
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <MapPin className="h-5 w-5" style={{ color: '#72AD97', backgroundColor: 'transparent' }} />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Indirizzo evento</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                    <div className="flex-1 flex items-center gap-2">
+                      {editingField === 'address' ? (
+                        <>
+                          <Input
+                            value={tempValues.address || ''}
+                            onChange={(e) => setTempValues({ ...tempValues, address: e.target.value })}
+                            className="flex-1 h-10 border-0 border-b border-border/30 rounded-none focus:border-primary bg-transparent"
+                            placeholder="Viale Montenapeoleone 10, Milano"
+                            autoFocus
+                          />
+                          <Button variant="ghost" size="sm" onClick={() => handleSaveField('address')}>
+                            <Save className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={handleCancelEdit}>
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </>
+                      ) : (
+                        <>
+                          <span className="flex-1 py-2">{event.address || 'Indirizzo non specificato'}</span>
+                          <Button variant="ghost" size="sm" onClick={() => handleStartEdit('address', event.address)}>
+                            <Edit2 className="h-4 w-4" />
+                          </Button>
+                        </>
+                      )}
                     </div>
-                    
-                    <span className="text-muted-foreground">al</span>
-                    
-                    {/* End Date */}
-                     <div className="flex items-center gap-2">
-                       {editingField === 'endDate' ? (
-                         <>
-                           <Input
-                             type="text"
-                             placeholder="GG/MM/AA"
-                             value={tempValues.endDate || ''}
-                             onChange={(e) => setTempValues({ ...tempValues, endDate: e.target.value })}
-                             className="h-10 border-0 border-b border-border/30 rounded-none focus:border-primary bg-transparent"
-                             autoFocus
-                           />
-                           <Button variant="ghost" size="sm" onClick={() => handleSaveField('endDate')}>
-                             <Save className="h-4 w-4" />
-                           </Button>
-                           <Button variant="ghost" size="sm" onClick={handleCancelEdit}>
-                             <X className="h-4 w-4" />
-                           </Button>
-                         </>
-                       ) : (
-                         <>
-                           <span className="py-2">{formatDateToDDMMYY(event.endDate) || 'Data non specificata'}</span>
-                           <Button variant="ghost" size="sm" onClick={() => handleStartEdit('endDate', formatDateToDDMMYY(event.endDate))}>
-                             <Edit2 className="h-4 w-4" />
-                           </Button>
-                         </>
-                       )}
+                  </div>
+                
+                  {/* Date fields */}
+                  <div className="flex items-center gap-3">
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Calendar className="h-5 w-5" style={{ color: '#72AD97', backgroundColor: 'transparent' }} />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Data inizio e fine evento</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                    <div className="flex-1">
+                      <div className="flex gap-2 items-center">
+                        {/* Start Date */}
+                        <div className="flex items-center gap-2">
+                          {editingField === 'startDate' ? (
+                            <>
+                              <Input
+                                type="text"
+                                placeholder="GG/MM/AA"
+                                value={tempValues.startDate || ''}
+                                onChange={(e) => setTempValues({ ...tempValues, startDate: e.target.value })}
+                                className="h-10 border-0 border-b border-border/30 rounded-none focus:border-primary bg-transparent"
+                                autoFocus
+                              />
+                              <Button variant="ghost" size="sm" onClick={() => handleSaveField('startDate')}>
+                                <Save className="h-4 w-4" />
+                              </Button>
+                              <Button variant="ghost" size="sm" onClick={handleCancelEdit}>
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </>
+                          ) : (
+                            <>
+                              <span className="py-2">{formatDateToDDMMYY(event.startDate) || 'Data non specificata'}</span>
+                              <Button variant="ghost" size="sm" onClick={() => handleStartEdit('startDate', formatDateToDDMMYY(event.startDate))}>
+                                <Edit2 className="h-4 w-4" />
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                        
+                        <span className="text-muted-foreground">al</span>
+                        
+                        {/* End Date */}
+                        <div className="flex items-center gap-2">
+                          {editingField === 'endDate' ? (
+                            <>
+                              <Input
+                                type="text"
+                                placeholder="GG/MM/AA"
+                                value={tempValues.endDate || ''}
+                                onChange={(e) => setTempValues({ ...tempValues, endDate: e.target.value })}
+                                className="h-10 border-0 border-b border-border/30 rounded-none focus:border-primary bg-transparent"
+                                autoFocus
+                              />
+                              <Button variant="ghost" size="sm" onClick={() => handleSaveField('endDate')}>
+                                <Save className="h-4 w-4" />
+                              </Button>
+                              <Button variant="ghost" size="sm" onClick={handleCancelEdit}>
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </>
+                          ) : (
+                            <>
+                              <span className="py-2">{formatDateToDDMMYY(event.endDate) || 'Data non specificata'}</span>
+                              <Button variant="ghost" size="sm" onClick={() => handleStartEdit('endDate', formatDateToDDMMYY(event.endDate))}>
+                                <Edit2 className="h-4 w-4" />
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Activity Code field */}
+                  <div className="flex items-center gap-3">
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Badge className="h-5 w-5" style={{ color: '#72AD97', backgroundColor: 'transparent' }} />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Codice attività</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                    <div className="flex-1 flex items-center gap-2">
+                      {editingField === 'activityCode' ? (
+                        <>
+                          <Input
+                            value={tempValues.activityCode || ''}
+                            onChange={(e) => setTempValues({ ...tempValues, activityCode: e.target.value })}
+                            className="flex-1 h-10 border-0 border-b border-border/30 rounded-none focus:border-primary bg-transparent"
+                            placeholder="Codice attività"
+                            autoFocus
+                          />
+                          <Button variant="ghost" size="sm" onClick={() => handleSaveField('activityCode')}>
+                            <Save className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={handleCancelEdit}>
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </>
+                      ) : (
+                        <>
+                          <span className="flex-1 py-2">{event.activityCode || 'Codice non specificato'}</span>
+                          <Button variant="ghost" size="sm" onClick={() => handleStartEdit('activityCode', event.activityCode)}>
+                            <Edit2 className="h-4 w-4" />
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Event Notes field */}
+                  <div className="flex items-start gap-3">
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <StickyNote className="h-5 w-5 mt-2" style={{ color: '#72AD97', backgroundColor: 'transparent' }} />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Note evento</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                    <div className="flex-1 flex flex-col gap-2">
+                      {editingField === 'notes' ? (
+                        <div className="flex flex-col gap-2">
+                          <Textarea
+                            value={tempValues.notes || ''}
+                            onChange={(e) => setTempValues({ ...tempValues, notes: e.target.value })}
+                            className="min-h-[80px] border-0 border-b border-border/30 rounded-none focus:border-primary bg-transparent"
+                            placeholder="Inserisci note per l'evento..."
+                            autoFocus
+                          />
+                          <div className="flex gap-2">
+                            <Button variant="ghost" size="sm" onClick={() => handleSaveField('notes')}>
+                              <Save className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="sm" onClick={handleCancelEdit}>
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-start gap-2">
+                          <div className="flex-1 py-2 min-h-[40px] text-sm">
+                            {event.notes || 'Nessuna nota inserita'}
+                          </div>
+                          <Button variant="ghost" size="sm" onClick={() => handleStartEdit('notes', event.notes)}>
+                            <Edit2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
-              </div>
-              
-              {/* Activity Code field */}
-              <div className="flex items-center gap-3">
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Badge className="h-5 w-5" style={{ color: '#72AD97', backgroundColor: 'transparent' }} />
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>Codice attività</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-                <div className="flex-1 flex items-center gap-2">
-                  {editingField === 'activityCode' ? (
-                    <>
-                      <Input
-                        value={tempValues.activityCode || ''}
-                        onChange={(e) => setTempValues({ ...tempValues, activityCode: e.target.value })}
-                        className="flex-1 h-10 border-0 border-b border-border/30 rounded-none focus:border-primary bg-transparent"
-                        placeholder="Codice attività"
-                        autoFocus
-                      />
-                      <Button variant="ghost" size="sm" onClick={() => handleSaveField('activityCode')}>
-                        <Save className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="sm" onClick={handleCancelEdit}>
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </>
-                  ) : (
-                    <>
-                      <span className="flex-1 py-2">{event.activityCode || 'Codice non specificato'}</span>
-                      <Button variant="ghost" size="sm" onClick={() => handleStartEdit('activityCode', event.activityCode)}>
-                        <Edit2 className="h-4 w-4" />
-                      </Button>
-                    </>
-                  )}
-                </div>
-              </div>
-
-              {/* Event Notes field */}
-              <div className="flex items-start gap-3">
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <StickyNote className="h-5 w-5 mt-2" style={{ color: '#72AD97', backgroundColor: 'transparent' }} />
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>Note evento</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-                <div className="flex-1 flex flex-col gap-2">
-                  {editingField === 'notes' ? (
-                    <div className="flex flex-col gap-2">
-                      <Textarea
-                        value={tempValues.notes || ''}
-                        onChange={(e) => setTempValues({ ...tempValues, notes: e.target.value })}
-                        className="min-h-[80px] border-0 border-b border-border/30 rounded-none focus:border-primary bg-transparent"
-                        placeholder="Inserisci note per l'evento..."
-                        autoFocus
-                      />
-                      <div className="flex gap-2">
-                        <Button variant="ghost" size="sm" onClick={() => handleSaveField('notes')}>
-                          <Save className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="sm" onClick={handleCancelEdit}>
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex items-start gap-2">
-                      <div className="flex-1 py-2 min-h-[40px] text-sm">
-                        {event.notes || 'Nessuna nota inserita'}
-                      </div>
-                      <Button variant="ghost" size="sm" onClick={() => handleStartEdit('notes', event.notes)}>
-                        <Edit2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
+              </CardContent>
+            </Card>
           </div>
-
-          {/* Right side - Shift Planning Form (60%) */}
-          <div className="flex-[0_0_60%]">
-            <ShiftPlanningForm 
-              onSubmit={handleShiftSubmit} 
-              eventStartDate={event.startDate}
-            />
+          
+          {/* Right side - Shift planning form (40%) */}
+          <div className="flex-[0_0_40%]">
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <ListChecks className="h-5 w-5" style={{ color: '#72AD97' }} />
+                  <h2 className="text-lg font-semibold">Inserimento Turno</h2>
+                </div>
+                <ShiftPlanningForm 
+                  onSubmit={handleShiftSubmit}
+                  eventStartDate={event.startDate}
+                />
+              </CardContent>
+            </Card>
           </div>
         </div>
       </section>
@@ -578,7 +657,7 @@ const EventDetail = () => {
       {/* Shifts Table */}
       <section>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="mt-6 text-2xl font-extrabold font-mulish" style={{ color: "#72AD97" }}>LISTA TURNI EVENTO</h2>
+          <h2 className="mt-6 text-2xl font-extrabold font-mulish" style={{ color: "#72AD97" }}>TABELLA LISTA TURNI</h2>
         </div>
         
         <div className="rounded-lg border border-border overflow-hidden">
@@ -615,11 +694,12 @@ const EventDetail = () => {
                     {sort.key !== 'operator' ? <ArrowUpDown className="h-4 w-4 text-muted-foreground" /> : (sort.dir === 'asc' ? <ArrowUp className="h-4 w-4 text-muted-foreground" /> : <ArrowDown className="h-4 w-4 text-muted-foreground" />)}
                   </Button>
                 </TableHead>
-                
+                <TableHead>TELEFONO</TableHead>
+                <TableHead>N° OPERATORI</TableHead>
                 <TableHead>ORE PAUSA</TableHead>
                 <TableHead>
                   <Button variant="ghost" size="sm" onClick={() => toggleSort('hours')} className="px-0">
-                    <span className="mr-2">ORE TOTALI</span>
+                    <span className="mr-2">ORE FATTURATE</span>
                     {sort.key !== 'hours' ? <ArrowUpDown className="h-4 w-4 text-muted-foreground" /> : (sort.dir === 'asc' ? <ArrowUp className="h-4 w-4 text-muted-foreground" /> : <ArrowDown className="h-4 w-4 text-muted-foreground" />)}
                   </Button>
                 </TableHead>
@@ -632,10 +712,8 @@ const EventDetail = () => {
               {sortedShifts.map((row, index) => (
                 <TableRow 
                   key={`${row.id}-${row.slotIndex}`}
-                  className={cn(
-                    "even:bg-muted transition-all duration-300 hover:bg-muted/80",
-                    !row.isAssigned && "bg-orange-50 hover:bg-orange-100 border-l-4 border-l-orange-300"
-                  )}
+                  data-unassigned={!row.isAssigned ? "true" : undefined}
+                  className="even:bg-muted transition-all duration-300 hover:bg-muted/80"
                 >
                   <TableCell>
                     {rowEdit[`${row.id}-${row.slotIndex}`] ? (
@@ -708,413 +786,329 @@ const EventDetail = () => {
                       <span className="text-sm">{row.activityType || "Non specificata"}</span>
                     )}
                   </TableCell>
-                   <TableCell>
-                     {rowEdit[`${row.id}-${row.slotIndex}`] ? (
-                       row.isAssigned ? (
-                         <div className="flex items-center gap-2">
-                           <span className="text-sm font-medium">{getOperatorName(row.operatorId)}</span>
-                           <Button 
-                             variant="ghost" 
-                             size="sm" 
-                             onClick={() => {
-                               setCurrentShift(row.id);
-                               setCurrentSlotIndex(row.slotIndex);
-                               setAssignOpen(true);
-                             }}
-                             aria-label={`Modifica operatore ${getOperatorName(row.operatorId)}`}
-                           >
-                             <Edit2 className="h-4 w-4" />
-                           </Button>
-                         </div>
-                       ) : (
-                         <Button 
-                           variant="outline" 
-                           size="sm" 
-                           onClick={() => {
-                             setCurrentShift(row.id);
-                             setCurrentSlotIndex(row.slotIndex);
-                             setAssignOpen(true);
-                           }}
-                         >
-                           <UserPlus className="h-4 w-4" />
-                           Assegna
-                         </Button>
-                       )
-                     ) : (
-                       row.isAssigned ? (
-                         <button
-                           className="text-sm text-primary hover:underline cursor-pointer transition-colors"
-                           onClick={() => {
-                             const operator = operators.find(op => op.id === row.operatorId);
-                             if (operator) {
-                               setSelectedOperator(operator);
-                               setOperatorDetailsOpen(true);
-                             }
-                           }}
-                         >
-                           {getOperatorName(row.operatorId)}
-                         </button>
-                       ) : (
-                         <span className="text-sm font-medium text-orange-700">Non assegnato</span>
-                       )
-                     )}
-                    </TableCell>
-                   <TableCell>
-                     {rowEdit[`${row.id}-${row.slotIndex}`] ? (
-                       <Input
-                         type="number"
-                         min="0"
-                         max="24"
-                         step="0.5"
-                         value={pauseHours[`${row.id}-${row.slotIndex}`] || shifts.find(s => s.id === row.id)?.pauseHours || 0}
-                         onChange={(e) => {
-                           const value = parseFloat(e.target.value) || 0;
-                           setPauseHours(prev => ({
-                             ...prev,
-                             [`${row.id}-${row.slotIndex}`]: value
-                           }));
-                         }}
-                         onBlur={() => {
-                           const value = pauseHours[`${row.id}-${row.slotIndex}`] || 0;
-                           updateShiftPauseHours(row.id, value);
-                         }}
-                         className="h-8 text-sm w-16 text-center"
-                       />
-                     ) : (
-                       <span className="text-sm">
-                         {pauseHours[`${row.id}-${row.slotIndex}`] || shifts.find(s => s.id === row.id)?.pauseHours || 0}h
-                       </span>
-                     )}
-                   </TableCell>
-                   <TableCell>
-                     {rowEdit[`${row.id}-${row.slotIndex}`] ? (
-                       <Input
-                         type="number"
-                         min="0"
-                         max="24"
-                         step="0.5"
-                         value={calculateHours(
-                           slotTimes[`${row.id}-${row.slotIndex}`]?.startTime || row.startTime, 
-                           slotTimes[`${row.id}-${row.slotIndex}`]?.endTime || row.endTime,
-                           pauseHours[`${row.id}-${row.slotIndex}`] || shifts.find(s => s.id === row.id)?.pauseHours || 0
-                         )}
-                        onChange={(e) => {
-                          const newHours = parseFloat(e.target.value) || 0;
-                          const startTime = slotTimes[`${row.id}-${row.slotIndex}`]?.startTime || row.startTime;
-                          const [startHour, startMinute] = startTime.split(':').map(Number);
-                          const startDate = new Date(2000, 0, 1, startHour, startMinute);
-                          const endDate = new Date(startDate.getTime() + newHours * 60 * 60 * 1000);
-                          const endTime = `${endDate.getHours().toString().padStart(2, '0')}:${endDate.getMinutes().toString().padStart(2, '0')}`;
-                          
-                          setSlotTimes(prev => ({
-                            ...prev,
-                            [`${row.id}-${row.slotIndex}`]: {
-                              ...prev[`${row.id}-${row.slotIndex}`],
-                              startTime,
-                              endTime
+                  <TableCell>
+                    {rowEdit[`${row.id}-${row.slotIndex}`] ? (
+                      row.isAssigned ? (
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium">{getOperatorName(row.operatorId)}</span>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={() => {
+                              setCurrentShift(row.id);
+                              setCurrentSlotIndex(row.slotIndex);
+                              setAssignOpen(true);
+                            }}
+                            aria-label={`Modifica operatore ${getOperatorName(row.operatorId)}`}
+                          >
+                            <Edit2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => {
+                            setCurrentShift(row.id);
+                            setCurrentSlotIndex(row.slotIndex);
+                            setAssignOpen(true);
+                          }}
+                        >
+                          <UserPlus className="h-4 w-4" />
+                          Assegna
+                        </Button>
+                      )
+                    ) : (
+                      row.isAssigned ? (
+                        <button
+                          className="text-sm text-primary hover:underline cursor-pointer transition-colors"
+                          onClick={() => {
+                            const operator = operators.find(op => op.id === row.operatorId);
+                            if (operator) {
+                              setSelectedOperator(operator);
+                              setOperatorDetailsOpen(true);
                             }
+                          }}
+                        >
+                          {getOperatorName(row.operatorId)}
+                        </button>
+                      ) : (
+                        <span className="text-sm font-medium text-orange-700">Non assegnato</span>
+                      )
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <span className="text-sm">{row.isAssigned ? getOperatorPhone(row.operatorId) : "-"}</span>
+                  </TableCell>
+                  <TableCell>
+                    <span className="text-sm">1</span>
+                  </TableCell>
+                  <TableCell>
+                    {rowEdit[`${row.id}-${row.slotIndex}`] ? (
+                      <Input
+                        type="number"
+                        min="0"
+                        max="24"
+                        step="0.5"
+                        value={pauseHours[`${row.id}-${row.slotIndex}`] || shifts.find(s => s.id === row.id)?.pauseHours || 0}
+                        onChange={(e) => {
+                          const value = parseFloat(e.target.value) || 0;
+                          setPauseHours(prev => ({
+                            ...prev,
+                            [`${row.id}-${row.slotIndex}`]: value
                           }));
+                        }}
+                        onBlur={() => {
+                          const value = pauseHours[`${row.id}-${row.slotIndex}`] || 0;
+                          updateShiftPauseHours(row.id, value);
                         }}
                         className="h-8 text-sm w-16 text-center"
                       />
                     ) : (
-                       <span className="text-sm font-medium">
-                         {calculateHours(
-                           slotTimes[`${row.id}-${row.slotIndex}`]?.startTime || row.startTime, 
-                           slotTimes[`${row.id}-${row.slotIndex}`]?.endTime || row.endTime,
-                           pauseHours[`${row.id}-${row.slotIndex}`] || shifts.find(s => s.id === row.id)?.pauseHours || 0
-                         )}h
-                       </span>
+                      <span className="text-sm">
+                        {pauseHours[`${row.id}-${row.slotIndex}`] || shifts.find(s => s.id === row.id)?.pauseHours || 0}h
+                      </span>
                     )}
                   </TableCell>
                   <TableCell>
                     {rowEdit[`${row.id}-${row.slotIndex}`] ? (
-                      row.isAssigned ? (
-                        <Checkbox
-                          checked={row.teamLeaderId === row.operatorId}
-                          onCheckedChange={() => handleToggleTeamLeader(row.id, row.operatorId, row.teamLeaderId === row.operatorId)}
-                          aria-label={row.teamLeaderId === row.operatorId ? "Rimuovi come team leader" : "Imposta come team leader"}
-                        />
-                      ) : "-"
-                    ) : (
-                      <span className="text-sm">{row.isAssigned && row.teamLeaderId === row.operatorId ? "Sì" : "-"}</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {rowEdit[`${row.id}-${row.slotIndex}`] ? (
-                      <div className="flex items-center justify-center">
-                        {(slotNotes[`${row.id}-${row.slotIndex}`] || row.notes) ? (
-                          <Popover 
-                            open={notePopoverOpen[`${row.id}-${row.slotIndex}`]} 
-                            onOpenChange={(open) => setNotePopoverOpen(prev => ({ ...prev, [`${row.id}-${row.slotIndex}`]: open }))}
-                          >
-                            <PopoverTrigger asChild>
-                              <Button 
-                                variant="ghost" 
-                                size="sm" 
-                                className="h-8 w-8 p-0"
-                                aria-label="Visualizza/modifica note"
-                              >
-                                <StickyNote className="h-4 w-4 text-primary" />
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-80 pointer-events-auto" align="center">
-                              <div className="space-y-4">
-                                <h4 className="font-medium">Note del turno</h4>
-                                <div className="space-y-2">
-                                  <Label htmlFor="note-edit">Contenuto</Label>
-                                  <Textarea
-                                    id="note-edit"
-                                    value={tempNotes || slotNotes[`${row.id}-${row.slotIndex}`] || row.notes || ""}
-                                    onChange={(e) => setTempNotes(e.target.value)}
-                                    placeholder="Inserisci note per il turno..."
-                                    className="min-h-[80px]"
-                                    onFocus={() => {
-                                      if (!tempNotes) {
-                                        setTempNotes(slotNotes[`${row.id}-${row.slotIndex}`] || row.notes || "");
-                                      }
-                                    }}
-                                  />
-                                </div>
-                                <div className="flex justify-end gap-2">
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => handleCancelEditNotes(`${row.id}-${row.slotIndex}`)}
-                                    type="button"
-                                  >
-                                    <X className="h-4 w-4 mr-1" />
-                                    Annulla
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    onClick={() => handleSaveNotes(`${row.id}-${row.slotIndex}`)}
-                                    type="button"
-                                  >
-                                    <Save className="h-4 w-4 mr-1" />
-                                    Salva
-                                  </Button>
-                                </div>
-                              </div>
-                            </PopoverContent>
-                          </Popover>
-                        ) : (
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            className="h-8 w-8 p-0"
-                            onClick={() => {
-                              setEditingNotes(`${row.id}-${row.slotIndex}`);
-                              setTempNotes("");
-                            }}
-                            aria-label="Aggiungi note"
-                          >
-                            <Plus className="h-4 w-4 text-muted-foreground" />
-                          </Button>
+                      <Input
+                        type="number"
+                        min="0"
+                        max="24"
+                        step="0.5"
+                        value={calculateHours(
+                          slotTimes[`${row.id}-${row.slotIndex}`]?.startTime || row.startTime, 
+                          slotTimes[`${row.id}-${row.slotIndex}`]?.endTime || row.endTime,
+                          pauseHours[`${row.id}-${row.slotIndex}`] || shifts.find(s => s.id === row.id)?.pauseHours || 0
                         )}
-                      </div>
-                    ) : (
-                      <div className="flex items-center justify-center">
-                        {(slotNotes[`${row.id}-${row.slotIndex}`] || row.notes) ? (
-                          <Popover 
-                            open={notePopoverOpen[`${row.id}-${row.slotIndex}`]} 
-                            onOpenChange={(open) => setNotePopoverOpen(prev => ({ ...prev, [`${row.id}-${row.slotIndex}`]: open }))}
-                          >
-                            <PopoverTrigger asChild>
-                              <Button 
-                                variant="ghost" 
-                                size="sm" 
-                                className="h-8 w-8 p-0"
-                                aria-label="Visualizza note"
-                              >
-                                <StickyNote className="h-4 w-4 text-primary" />
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-80 pointer-events-auto" align="center">
-                              <div className="space-y-4">
-                                <h4 className="font-medium">Note del turno</h4>
-                                <div className="p-3 bg-muted rounded-md">
-                                  <p className="text-sm">{slotNotes[`${row.id}-${row.slotIndex}`] || row.notes}</p>
-                                </div>
-                              </div>
-                            </PopoverContent>
-                          </Popover>
-                        ) : (
-                          <span className="text-sm text-muted-foreground">-</span>
-                        )}
-                      </div>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          const rowKey = `${row.id}-${row.slotIndex}`;
-                          setRowEdit(prev => ({ ...prev, [rowKey]: !prev[rowKey] }));
-                        }}
-                        className="h-8 w-8 p-0 transition-all duration-300 hover:scale-110"
-                        aria-label={rowEdit[`${row.id}-${row.slotIndex}`] ? "Blocca modifiche" : "Abilita modifiche"}
-                      >
-                        {rowEdit[`${row.id}-${row.slotIndex}`] ? (
-                          <Unlock className="h-4 w-4 text-green-600 transition-transform duration-300" />
-                        ) : (
-                          <Lock className="h-4 w-4 text-muted-foreground transition-transform duration-300" />
-                        )}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDuplicateShift(row)}
-                        aria-label="Copia turno"
-                        title="Copia turno (solo data, orari e tipologia attività)"
-                      >
-                        <Copy className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          if (row.isAssigned) {
-                            removeOperator(row.id, row.operatorId);
-                            // Check if this was the last operator, if so delete the shift
-                            const shift = shifts.find(s => s.id === row.id);
-                            if (shift && shift.operatorIds.filter(id => id && id.trim() !== "" && id !== row.operatorId).length === 0) {
-                              deleteShift(row.id);
-                            }
-                          } else {
-                            deleteShift(row.id);
-                          }
-                        }}
-                        className="text-destructive hover:text-destructive"
-                        aria-label="Elimina riga"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
+                       onChange={(e) => {
+                         const newHours = parseFloat(e.target.value) || 0;
+                         const startTime = slotTimes[`${row.id}-${row.slotIndex}`]?.startTime || row.startTime;
+                         const [startHour, startMinute] = startTime.split(':').map(Number);
+                         const startDate = new Date(2000, 0, 1, startHour, startMinute);
+                         const endDate = new Date(startDate.getTime() + newHours * 60 * 60 * 1000);
+                         const endTime = `${endDate.getHours().toString().padStart(2, '0')}:${endDate.getMinutes().toString().padStart(2, '0')}`;
+                         
+                         setSlotTimes(prev => ({
+                           ...prev,
+                           [`${row.id}-${row.slotIndex}`]: {
+                             ...prev[`${row.id}-${row.slotIndex}`],
+                             startTime,
+                             endTime
+                           }
+                         }));
+                       }}
+                       className="h-8 text-sm w-16 text-center"
+                     />
+                   ) : (
+                      <span className="text-sm font-medium">
+                        {calculateHours(
+                          slotTimes[`${row.id}-${row.slotIndex}`]?.startTime || row.startTime, 
+                          slotTimes[`${row.id}-${row.slotIndex}`]?.endTime || row.endTime,
+                          pauseHours[`${row.id}-${row.slotIndex}`] || shifts.find(s => s.id === row.id)?.pauseHours || 0
+                        )}h
+                      </span>
+                   )}
+                 </TableCell>
+                 <TableCell>
+                   {rowEdit[`${row.id}-${row.slotIndex}`] ? (
+                     row.isAssigned ? (
+                       <Checkbox
+                         checked={row.teamLeaderId === row.operatorId}
+                         onCheckedChange={() => handleToggleTeamLeader(row.id, row.operatorId, row.teamLeaderId === row.operatorId)}
+                         aria-label={row.teamLeaderId === row.operatorId ? "Rimuovi come team leader" : "Imposta come team leader"}
+                       />
+                     ) : "-"
+                   ) : (
+                     <span className="text-sm">{row.isAssigned && row.teamLeaderId === row.operatorId ? "Sì" : "-"}</span>
+                   )}
+                 </TableCell>
+                 <TableCell>
+                   {rowEdit[`${row.id}-${row.slotIndex}`] ? (
+                     <div className="flex items-center justify-center">
+                       {(slotNotes[`${row.id}-${row.slotIndex}`] || row.notes) ? (
+                         <Popover 
+                           open={notePopoverOpen[`${row.id}-${row.slotIndex}`]} 
+                           onOpenChange={(open) => setNotePopoverOpen(prev => ({ ...prev, [`${row.id}-${row.slotIndex}`]: open }))}
+                         >
+                           <PopoverTrigger asChild>
+                             <Button 
+                               variant="ghost" 
+                               size="sm" 
+                               className="h-8 w-8 p-0"
+                               aria-label="Visualizza/modifica note"
+                             >
+                               <StickyNote className="h-4 w-4 text-primary" />
+                             </Button>
+                           </PopoverTrigger>
+                           <PopoverContent className="w-80 pointer-events-auto" align="center">
+                             <div className="space-y-4">
+                               <h4 className="font-medium">Note del turno</h4>
+                               <div className="space-y-2">
+                                 <Label htmlFor="note-edit">Contenuto</Label>
+                                 <Textarea
+                                   id="note-edit"
+                                   value={tempNotes || slotNotes[`${row.id}-${row.slotIndex}`] || row.notes || ""}
+                                   onChange={(e) => setTempNotes(e.target.value)}
+                                   placeholder="Inserisci note per il turno..."
+                                   className="min-h-[80px]"
+                                   onFocus={() => {
+                                     if (!tempNotes) {
+                                       setTempNotes(slotNotes[`${row.id}-${row.slotIndex}`] || row.notes || "");
+                                     }
+                                   }}
+                                 />
+                               </div>
+                               <div className="flex justify-end gap-2">
+                                 <Button
+                                   variant="outline"
+                                   size="sm"
+                                   onClick={() => handleCancelEditNotes(`${row.id}-${row.slotIndex}`)}
+                                   type="button"
+                                 >
+                                   <X className="h-4 w-4 mr-1" />
+                                   Annulla
+                                 </Button>
+                                 <Button
+                                   size="sm"
+                                   onClick={() => handleSaveNotes(`${row.id}-${row.slotIndex}`)}
+                                   type="button"
+                                 >
+                                   <Save className="h-4 w-4 mr-1" />
+                                   Salva
+                                 </Button>
+                               </div>
+                             </div>
+                           </PopoverContent>
+                         </Popover>
+                       ) : (
+                         <Button 
+                           variant="ghost" 
+                           size="sm" 
+                           className="h-8 w-8 p-0"
+                           onClick={() => {
+                             setEditingNotes(`${row.id}-${row.slotIndex}`);
+                             setTempNotes("");
+                           }}
+                           aria-label="Aggiungi note"
+                         >
+                           <Plus className="h-4 w-4 text-muted-foreground" />
+                         </Button>
+                       )}
+                     </div>
+                   ) : (
+                     <div className="flex items-center justify-center">
+                       {(slotNotes[`${row.id}-${row.slotIndex}`] || row.notes) ? (
+                         <Popover 
+                           open={notePopoverOpen[`${row.id}-${row.slotIndex}`]} 
+                           onOpenChange={(open) => setNotePopoverOpen(prev => ({ ...prev, [`${row.id}-${row.slotIndex}`]: open }))}
+                         >
+                           <PopoverTrigger asChild>
+                             <Button 
+                               variant="ghost" 
+                               size="sm" 
+                               className="h-8 w-8 p-0"
+                               aria-label="Visualizza note"
+                             >
+                               <StickyNote className="h-4 w-4 text-primary" />
+                             </Button>
+                           </PopoverTrigger>
+                           <PopoverContent className="w-80 pointer-events-auto" align="center">
+                             <div className="space-y-4">
+                               <h4 className="font-medium">Note del turno</h4>
+                               <div className="space-y-2">
+                                 <p className="text-sm text-muted-foreground">{slotNotes[`${row.id}-${row.slotIndex}`] || row.notes}</p>
+                               </div>
+                               <Button 
+                                 size="sm" 
+                                 variant="outline" 
+                                 onClick={() => setNotePopoverOpen(prev => ({ ...prev, [`${row.id}-${row.slotIndex}`]: false }))}
+                               >
+                                 Chiudi
+                               </Button>
+                             </div>
+                           </PopoverContent>
+                         </Popover>
+                       ) : (
+                         <span className="text-sm text-muted-foreground">-</span>
+                       )}
+                     </div>
+                   )}
+                 </TableCell>
+                 <TableCell>
+                   <div className="flex items-center gap-2">
+                     <Button 
+                       variant="ghost" 
+                       size="sm" 
+                       onClick={() => deleteShift(row.id)}
+                       aria-label="Elimina turno"
+                     >
+                       <Trash2 className="h-4 w-4" />
+                     </Button>
+                     <Button 
+                       variant="ghost" 
+                       size="sm" 
+                       className={rowEdit[`${row.id}-${row.slotIndex}`] ? "text-green-600" : "text-muted-foreground"}
+                       onClick={() => setRowEdit(prev => ({ ...prev, [`${row.id}-${row.slotIndex}`]: !prev[`${row.id}-${row.slotIndex}`] }))}
+                       aria-label={rowEdit[`${row.id}-${row.slotIndex}`] ? "Blocca modifica" : "Sblocca modifica"}
+                     >
+                       {rowEdit[`${row.id}-${row.slotIndex}`] ? <Unlock className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
+                     </Button>
+                   </div>
+                 </TableCell>
+               </TableRow>
               ))}
-              {sortedShifts.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
-                    Nessun turno pianificato. Crea il primo turno.
-                  </TableCell>
-                </TableRow>
-              )}
             </TableBody>
+            <TableFooter>
+              <TableRow>
+                <TableCell colSpan={9} className="text-right font-medium">
+                  Totale ore fatturate: {totalBillableHours.toFixed(1)}h
+                </TableCell>
+                <TableCell className="text-right font-medium">
+                  Totale ore assegnate: {totalOperatorHours.toFixed(1)}h
+                </TableCell>
+                <TableCell></TableCell>
+              </TableRow>
+            </TableFooter>
           </Table>
-        </div>
-        
-        {/* Total hours summary */}
-        <div className="mt-4 p-4 bg-muted/50 rounded-lg border">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-muted-foreground">Totale ore operatori:</span>
-            <span className="text-lg font-bold" style={{ color: '#72AD97' }}>
-              {totalOperatorHours.toFixed(1)}h
-            </span>
-          </div>
         </div>
       </section>
 
-      {/* Dialog per modificare note */}
-      <Dialog open={!!editingNotes} onOpenChange={() => {
-        setEditingNotes(null);
-        setTempNotes("");
-      }}>
+      {/* Email confirmation dialog */}
+      <Dialog open={emailModalOpen} onOpenChange={setEmailModalOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Aggiungi Note Turno</DialogTitle>
+            <DialogTitle>Conferma invio email</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <Textarea 
-              value={tempNotes} 
-              onChange={e => setTempNotes(e.target.value)} 
-              placeholder="Inserisci note per il turno" 
-              className="min-h-[80px]"
-              autoFocus
-            />
+            <p>Vuoi inviare una email di notifica turno a {selectedShiftForEmail ? getOperatorName(selectedShiftForEmail.operatorId) : ''}?</p>
             <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => handleCancelEditNotes()}>
+              <Button variant="outline" onClick={() => setEmailModalOpen(false)}>
                 Annulla
               </Button>
-              <Button onClick={() => editingNotes && handleSaveNotes(editingNotes)}>
-                Salva
+              <Button onClick={confirmSendEmail}>
+                Invia Email
               </Button>
             </div>
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* Dialog per invio email */}
-      <Dialog open={emailModalOpen} onOpenChange={setEmailModalOpen}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <StickyNote className="h-5 w-5" />
-              Invia email all'operatore
-            </DialogTitle>
-          </DialogHeader>
-          {selectedShiftForEmail && (
-            <div className="space-y-4">
-              <div className="bg-muted p-4 rounded-lg space-y-3">
-                <h4 className="font-medium">Riepilogo turno</h4>
-                <div className="grid grid-cols-2 gap-2 text-sm">
-                  <div>
-                    <span className="font-medium">Operatore:</span>
-                    <p>{getOperatorName(selectedShiftForEmail.operatorId)}</p>
-                  </div>
-                  <div>
-                    <span className="font-medium">Data:</span>
-                    <p>{selectedShiftForEmail.date}</p>
-                  </div>
-                  <div>
-                    <span className="font-medium">Ora inizio:</span>
-                    <p>{slotTimes[`${selectedShiftForEmail.id}-${selectedShiftForEmail.slotIndex}`]?.startTime || selectedShiftForEmail.startTime}</p>
-                  </div>
-                  <div>
-                    <span className="font-medium">Ora fine:</span>
-                    <p>{slotTimes[`${selectedShiftForEmail.id}-${selectedShiftForEmail.slotIndex}`]?.endTime || selectedShiftForEmail.endTime}</p>
-                  </div>
-                  <div className="col-span-2">
-                    <span className="font-medium">Attività:</span>
-                    <p>{selectedShiftForEmail.activityType || "Non specificata"}</p>
-                  </div>
-                  <div className="col-span-2">
-                    <span className="font-medium">Note:</span>
-                    <p className="text-muted-foreground">
-                      {slotNotes[`${selectedShiftForEmail.id}-${selectedShiftForEmail.slotIndex}`] || selectedShiftForEmail.notes || "Nessuna nota"}
-                    </p>
-                  </div>
-                </div>
-              </div>
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setEmailModalOpen(false)}>
-                  <X className="h-4 w-4 mr-1" />
-                  Annulla
-                </Button>
-                <Button onClick={confirmSendEmail}>
-                  <StickyNote className="h-4 w-4 mr-1" />
-                  Invia
-                </Button>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      <OperatorDetailsDialog
-        operator={selectedOperator}
+      {/* Operator Details Dialog */}
+      <OperatorDetailsDialog 
         open={operatorDetailsOpen}
         onOpenChange={setOperatorDetailsOpen}
+        operator={selectedOperator}
       />
 
+      {/* Operator Assignment Dialog */}
       <OperatorAssignDialog
-        open={assignOpen} 
-        onOpenChange={setAssignOpen} 
-        operators={currentShift ? operators.filter(op => !shifts.find(s => s.id === currentShift)?.operatorIds.includes(op.id)) : operators} 
-        onConfirm={onAssign} 
+        open={assignOpen}
+        onOpenChange={setAssignOpen}
+        onConfirm={onAssign}
+        currentOperatorId={currentShift && currentSlotIndex !== null ? 
+          shifts.find(s => s.id === currentShift)?.operatorIds[currentSlotIndex] || "" : ""}
       />
     </main>
   );
